@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/css/styles.css">
+<title>Fmidia — Gestão de redes sociais</title>
+<meta name="description" content="Agende posts, aprove conteúdos com clientes, responda mensagens e gere relatórios de todas as redes sociais em um só lugar.">
+</head>
+<body>
+<header class="site-header">
+  <div class="container">
+    <a class="logo" href="/"><span class="logo-mark">F</span>Fmidia</a>
+    <nav class="nav"><a href="#recursos">Recursos</a><a href="#como-funciona">Como funciona</a><a href="#planos">Planos</a></nav>
+    <span class="spacer"></span>
+    <a class="btn" href="/entrar">Entrar</a>
+    <a class="btn primary" href="/entrar?cadastro=1">Testar grátis</a>
+  </div>
+</header>
+
+<main>
+  <section class="hero container">
+    <h1>Todas as suas redes sociais <span>em um só painel</span></h1>
+    <p>Planeje, agende, aprove com o cliente, responda o público e prove resultados com relatórios prontos. Feito para social media, agências e pequenas empresas.</p>
+    <div class="row">
+      <a class="btn primary" href="/entrar?cadastro=1">Começar agora, é grátis</a>
+      <a class="btn" href="/entrar?demo=1">Ver demonstração</a>
+    </div>
+    <div class="networks-strip" id="networks"></div>
+  </section>
+
+  <section class="section container" id="recursos">
+    <h2>Tudo o que a rotina de social media precisa</h2>
+    <p class="lead">Menos abas abertas, menos planilhas e mais tempo para criar.</p>
+    <div class="grid features">
+      <div class="card feature"><div class="icon">🗓️</div><h3>Agendamento multirredes</h3><p>Crie uma vez e publique no Instagram, Facebook, LinkedIn, TikTok, X, YouTube, Pinterest e Google Meu Negócio.</p></div>
+      <div class="card feature"><div class="icon">📅</div><h3>Calendário editorial</h3><p>Visualize o mês inteiro de cada marca, com o status de cada conteúdo por cores.</p></div>
+      <div class="card feature"><div class="icon">✅</div><h3>Aprovação do cliente</h3><p>Envie um link para o cliente aprovar ou pedir ajustes, sem precisar criar uma conta.</p></div>
+      <div class="card feature"><div class="icon">📊</div><h3>Analytics e relatórios</h3><p>Seguidores, alcance, impressões, engajamento e cliques, comparados ao período anterior e prontos para PDF.</p></div>
+      <div class="card feature"><div class="icon">💬</div><h3>Caixa de entrada unificada</h3><p>Comentários, mensagens e menções de todos os perfis em um só lugar, com resposta rápida.</p></div>
+      <div class="card feature"><div class="icon">👥</div><h3>Equipe e várias marcas</h3><p>Gerencie vários clientes e convide sua equipe como proprietário, editor ou leitor.</p></div>
+    </div>
+  </section>
+
+  <section class="section container" id="como-funciona">
+    <h2>Como funciona</h2>
+    <p class="lead">Em poucos minutos sua operação está rodando.</p>
+    <div class="grid features">
+      <div class="card"><h3>1. Conecte os perfis</h3><p class="muted">Adicione as redes de cada marca que você gerencia.</p></div>
+      <div class="card"><h3>2. Crie e aprove</h3><p class="muted">Escreva o post, veja a prévia e envie o link de aprovação ao cliente.</p></div>
+      <div class="card"><h3>3. Agende e meça</h3><p class="muted">A Fmidia publica no horário certo e consolida os resultados para você.</p></div>
+    </div>
+  </section>
+
+  <section class="section container" id="planos">
+    <h2>Planos simples</h2>
+    <p class="lead">Comece grátis e evolua conforme sua carteira de clientes cresce.</p>
+    <div class="grid pricing">
+      <div class="card plan"><h3>Essencial</h3><div class="price">R$ 0</div><p class="muted">Para quem está começando</p>
+        <ul><li>1 marca</li><li>Até 3 perfis</li><li>30 agendamentos por mês</li><li>Analytics de 30 dias</li></ul>
+        <a class="btn" href="/entrar?cadastro=1">Criar conta</a></div>
+      <div class="card plan featured"><span class="badge scheduled">Mais escolhido</span><h3>Profissional</h3><div class="price">R$ 79<small class="muted" style="font-size:.4em">/mês</small></div><p class="muted">Para social media freelancer</p>
+        <ul><li>5 marcas</li><li>Perfis ilimitados</li><li>Agendamentos ilimitados</li><li>Aprovação do cliente</li><li>Relatórios em PDF</li></ul>
+        <a class="btn primary" href="/entrar?cadastro=1">Testar 14 dias grátis</a></div>
+      <div class="card plan"><h3>Agência</h3><div class="price">R$ 249<small class="muted" style="font-size:.4em">/mês</small></div><p class="muted">Para equipes e agências</p>
+        <ul><li>Marcas ilimitadas</li><li>Equipe ilimitada com permissões</li><li>Caixa de entrada unificada</li><li>Analytics de 90 dias</li><li>Suporte prioritário</li></ul>
+        <a class="btn" href="/entrar?cadastro=1">Falar com vendas</a></div>
+    </div>
+  </section>
+
+  <section class="section container">
+    <div class="cta-band">
+      <h2 style="color:#fff">Pronto para organizar suas redes?</h2>
+      <p>Crie sua conta em menos de um minuto.</p>
+      <a class="btn" href="/entrar?cadastro=1">Começar grátis</a>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer"><div class="container row"><span>© Fmidia</span><span class="spacer"></span><a href="/entrar">Entrar</a></div></footer>
+<script>
+fetch('/api/networks').then(r => r.json()).then(({ networks }) => {
+  document.getElementById('networks').innerHTML = Object.values(networks)
+    .map(n => '<span class="badge" style="background:' + n.color + ';color:#fff">' + n.label + '</span>').join('');
+});
+</script>
+</body>
+</html>

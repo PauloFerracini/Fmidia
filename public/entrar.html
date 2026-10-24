@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/css/styles.css">
+<title>Entrar — Fmidia</title>
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="card auth-card">
+    <a class="logo" href="/"><span class="logo-mark">F</span>Fmidia</a>
+    <div class="tabs"><button data-tab="login" class="active">Entrar</button><button data-tab="register">Criar conta</button></div>
+    <form id="form">
+      <div class="field" id="name-field" hidden><label for="name">Nome</label><input id="name" autocomplete="name"></div>
+      <div class="field"><label for="email">E-mail</label><input id="email" type="email" required autocomplete="email"></div>
+      <div class="field"><label for="password">Senha</label><input id="password" type="password" required minlength="6" autocomplete="current-password"></div>
+      <p class="error-msg" id="err"></p>
+      <button class="btn primary" style="width:100%" id="submit">Entrar</button>
+    </form>
+    <p class="hint" style="margin-top:1em">Quer só explorar? <a href="#" id="demo">Entrar com a conta demo</a></p>
+  </div>
+</div>
+<script>
+const params = new URLSearchParams(location.search);
+let mode = params.has('cadastro') ? 'register' : 'login';
+const $ = (id) => document.getElementById(id);
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === m));
+  $('name-field').hidden = m !== 'register';
+  $('name').required = m === 'register';
+  $('submit').textContent = m === 'register' ? 'Criar conta' : 'Entrar';
+  $('password').autocomplete = m === 'register' ? 'new-password' : 'current-password';
+}
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => setMode(b.dataset.tab));
+setMode(mode);
+async function auth(path, body) {
+  $('err').textContent = '';
+  const res = await fetch('/api/auth/' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const data = await res.json();
+  if (!res.ok) return $('err').textContent = data.error;
+  location.href = '/app';
+}
+$('form').onsubmit = (e) => {
+  e.preventDefault();
+  auth(mode, { name: $('name').value, email: $('email').value, password: $('password').value });
+};
+$('demo').onclick = (e) => { e.preventDefault(); auth('login', { email: 'demo@fmidia.com', password: 'demo123' }); };
+if (params.has('demo')) $('demo').click();
+fetch('/api/auth/me').then(r => { if (r.ok && !params.has('demo')) location.href = '/app'; });
+</script>
+</body>
+</html>

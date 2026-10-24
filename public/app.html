@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/styles.css">
+<title>Painel — Fmidia</title>
+</head>
+<body>
+<div class="mobile-bar"><button class="btn small" id="menu-btn" aria-label="Abrir menu">☰</button><a class="logo" href="#/dashboard"><span class="logo-mark">F</span>Fmidia</a></div>
+<div class="shell">
+  <aside class="sidebar" id="sidebar">
+    <a class="logo" href="#/dashboard"><span class="logo-mark">F</span>Fmidia</a>
+    <div>
+      <label for="brand-select" class="hint">Marca</label>
+      <div class="brand-switch"><span class="brand-dot" id="brand-dot"></span><select id="brand-select"></select></div>
+    </div>
+    <nav id="nav">
+      <a href="#/dashboard">📊 Visão geral</a>
+      <a href="#/calendario">📅 Calendário</a>
+      <a href="#/posts">📝 Posts</a>
+      <a href="#/novo">➕ Criar post</a>
+      <a href="#/inbox">💬 Caixa de entrada <span class="count" id="inbox-count" hidden></span></a>
+      <a href="#/relatorio">📄 Relatório</a>
+      <a href="#/perfis">🔗 Perfis conectados</a>
+      <a href="#/equipe">👥 Equipe e marca</a>
+    </nav>
+    <span class="spacer"></span>
+    <div class="hint" id="user-box"></div>
+    <button class="btn small" id="logout">Sair</button>
+  </aside>
+  <main class="main" id="view"></main>
+</div>
+<script src="/js/charts.js"></script>
+<script src="/js/app.js"></script>
+</body>
+</html>

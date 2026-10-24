@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/css/styles.css">
+<title>Aprovação de conteúdo — Fmidia</title>
+</head>
+<body>
+<div class="auth-wrap">
+  <div class="card" style="width:100%;max-width:520px" id="root"><p class="muted">Carregando…</p></div>
+</div>
+<script>
+const token = new URLSearchParams(location.search).get('t');
+const root = document.getElementById('root');
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const STATUS = { pending_approval: 'Aguardando sua aprovação', approved: 'Aprovado', scheduled: 'Aprovado e agendado', rejected: 'Ajustes solicitados', published: 'Publicado' };
+async function load() {
+  const res = await fetch('/api/approval/' + encodeURIComponent(token || ''));
+  const p = await res.json();
+  if (!res.ok) { root.innerHTML = '<h2>Link inválido</h2><p class="muted">' + esc(p.error) + '</p>'; return; }
+  const when = p.scheduled_at ? new Date(p.scheduled_at).toLocaleString('pt-BR', { dateStyle: 'full', timeStyle: 'short' }) : 'Data a definir';
+  root.innerHTML =
+    '<div class="row"><span class="brand-dot" style="background:' + esc(p.brand_color) + '"></span><strong>' + esc(p.brand_name) + '</strong><span class="spacer"></span><span class="badge ' + p.status + '">' + (STATUS[p.status] || p.status) + '</span></div>' +
+    '<p class="muted" style="margin:.5em 0 1em">Publicação prevista: ' + esc(when) + '<br>Em: ' + p.targets.map(t => esc(t.network) + ' ' + esc(t.handle)).join(', ') + '</p>' +
+    (p.media_url ? '<img src="' + esc(p.media_url) + '" alt="" style="border-radius:12px;width:100%;aspect-ratio:1;object-fit:cover">' : '') +
+    '<p style="white-space:pre-wrap">' + esc(p.caption) + '</p>' +
+    (p.approval_comment ? '<p class="reply"><strong>Comentário:</strong> ' + esc(p.approval_comment) + '</p>' : '') +
+    (p.status === 'pending_approval' ?
+      '<div class="field"><label for="c">Comentário (obrigatório para pedir ajustes)</label><textarea id="c" style="min-height:80px"></textarea></div>' +
+      '<p class="error-msg" id="err"></p><div class="row"><button class="btn primary" data-d="approve">Aprovar</button><button class="btn danger" data-d="reject">Pedir ajustes</button></div>' : '');
+  root.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => {
+    const r = await fetch('/api/approval/' + encodeURIComponent(token), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision: b.dataset.d, comment: document.getElementById('c').value }) });
+    const d = await r.json();
+    if (!r.ok) return document.getElementById('err').textContent = d.error;
+    load();
+  });
+}
+load();
+</script>
+</body>
+</html>
