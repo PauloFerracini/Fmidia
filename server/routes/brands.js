@@ -2,6 +2,7 @@ const express = require('express');
 const { requireBrand } = require('../auth');
 const { NETWORKS } = require('../networks');
 const { seedMetrics } = require('../metrics');
+const integrations = require('../integrations');
 const { tx } = require('../db');
 
 module.exports = function brandRoutes(db) {
@@ -75,25 +76,39 @@ module.exports = function brandRoutes(db) {
 
   // Perfis sociais conectados
   r.get('/:brandId/profiles', requireBrand(db), (req, res) => {
-    res.json(db.prepare('SELECT * FROM profiles WHERE brand_id = ? ORDER BY network, handle').all(req.brandId));
+    res.json(db.prepare(`SELECT ${integrations.PUBLIC_PROFILE_COLS} FROM profiles WHERE brand_id = ? ORDER BY network, handle`).all(req.brandId));
   });
 
   r.post('/:brandId/profiles', requireBrand(db, 'editor'), (req, res) => {
     const { network, handle } = req.body || {};
     if (!NETWORKS[network]) return res.status(400).json({ error: 'Rede inválida' });
     if (!handle?.trim()) return res.status(400).json({ error: 'Informe o @ do perfil' });
-    // Na integração real isso seria o retorno do fluxo OAuth da rede.
+    // Perfil de demonstração. Os reais entram pelo login OAuth (routes/oauth.js).
     const followers = 500 + Math.floor(Math.random() * 20000);
     const { lastInsertRowid } = db.prepare('INSERT INTO profiles (brand_id, network, handle, followers) VALUES (?, ?, ?, ?)')
       .run(req.brandId, network, handle.trim().replace(/^@?/, '@'), followers);
-    const profile = db.prepare('SELECT * FROM profiles WHERE id = ?').get(lastInsertRowid);
-    seedMetrics(db, profile);
-    res.status(201).json(profile);
+    seedMetrics(db, db.prepare('SELECT * FROM profiles WHERE id = ?').get(lastInsertRowid));
+    res.status(201).json(db.prepare(`SELECT ${integrations.PUBLIC_PROFILE_COLS} FROM profiles WHERE id = ?`).get(lastInsertRowid));
   });
 
-  r.delete('/:brandId/profiles/:profileId', requireBrand(db, 'editor'), (req, res) => {
-    db.prepare('DELETE FROM profiles WHERE id = ? AND brand_id = ?').run(Number(req.params.profileId), req.brandId);
+  r.delete('/:brandId/profiles/:profileId', requireBrand(db, 'editor'), async (req, res) => {
+    const profile = db.prepare('SELECT * FROM profiles WHERE id = ? AND brand_id = ?').get(Number(req.params.profileId), req.brandId);
+    if (profile) await integrations.disconnect(db, profile);
     res.json({ ok: true });
+  });
+
+  // Sincroniza agora métricas e comentários de um perfil conectado de verdade.
+  r.post('/:brandId/profiles/:profileId/sync', requireBrand(db, 'editor'), async (req, res) => {
+    const profile = db.prepare("SELECT * FROM profiles WHERE id = ? AND brand_id = ? AND mode = 'live'").get(Number(req.params.profileId), req.brandId);
+    if (!profile) return res.status(404).json({ error: 'Perfil não encontrado' });
+    try {
+      await integrations.syncMetrics(db, profile, 7);
+      const added = await integrations.syncInbox(db, db.prepare('SELECT * FROM profiles WHERE id = ?').get(profile.id));
+      res.json({ ok: true, newComments: added });
+    } catch (err) {
+      db.prepare('UPDATE profiles SET last_error = ? WHERE id = ?').run(err.message, profile.id);
+      res.status(502).json({ error: err.message });
+    }
   });
 
   return r;

@@ -1,7 +1,8 @@
 const express = require('express');
 const { hashPassword, verifyPassword, createSession, requireAuth } = require('../auth');
+const { config } = require('../config');
 
-const COOKIE = { httpOnly: true, sameSite: 'lax', maxAge: 30 * 864e5 };
+const cookieOpts = () => ({ httpOnly: true, sameSite: 'lax', maxAge: 30 * 864e5, secure: config.publicUrl().startsWith('https://') });
 
 module.exports = function authRoutes(db) {
   const r = express.Router();
@@ -16,7 +17,7 @@ module.exports = function authRoutes(db) {
     }
     const { lastInsertRowid } = db.prepare('INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)')
       .run(String(name).trim(), normalized, hashPassword(password));
-    res.cookie('fm_session', createSession(db, Number(lastInsertRowid)), COOKIE);
+    res.cookie('fm_session', createSession(db, Number(lastInsertRowid)), cookieOpts());
     res.status(201).json({ id: Number(lastInsertRowid), name, email: normalized });
   });
 
@@ -26,7 +27,7 @@ module.exports = function authRoutes(db) {
     if (!user || !password || !verifyPassword(password, user.password_hash)) {
       return res.status(401).json({ error: 'E-mail ou senha inválidos' });
     }
-    res.cookie('fm_session', createSession(db, user.id), COOKIE);
+    res.cookie('fm_session', createSession(db, user.id), cookieOpts());
     res.json({ id: user.id, name: user.name, email: user.email });
   });
 

@@ -4,6 +4,8 @@ const { openDb } = require('../server/db');
 const { createApp } = require('../server/app');
 const { runDuePosts } = require('../server/scheduler');
 
+process.env.FMIDIA_SECRET = 'teste';
+
 async function setup() {
   const db = openDb(':memory:');
   const server = createApp(db).listen(0);
@@ -45,7 +47,11 @@ test('fluxo completo: marca, perfil, post, aprovação e publicação', async (t
   assert.match(r.body.error, /280/);
 
   const future = new Date(Date.now() + 3600e3).toISOString();
-  const post = (await api(`/brands/${brand.id}/posts`, { method: 'POST', body: { caption: 'Pão quentinho!', profileIds: [ig.id, x.id], scheduledAt: future } })).body;
+  // Instagram não publica sem mídia.
+  r = await api(`/brands/${brand.id}/posts`, { method: 'POST', body: { caption: 'Pão', profileIds: [ig.id] } });
+  assert.match(r.body.error, /exige/);
+  const post = (await api(`/brands/${brand.id}/posts`, { method: 'POST', body: { caption: 'Pão quentinho!', mediaUrls: ['https://x.com/a.jpg'], profileIds: [ig.id, x.id], scheduledAt: future } })).body;
+  assert.deepEqual(post.media, ['https://x.com/a.jpg']);
   assert.equal(post.status, 'draft');
   assert.equal(post.targets.length, 2);
 
@@ -59,8 +65,8 @@ test('fluxo completo: marca, perfil, post, aprovação e publicação', async (t
   assert.equal((await anon(`/approval/${token}`, { method: 'POST', body: { decision: 'approve' } })).status, 409);
 
   // Ainda não está na hora; depois de 2h deve publicar nas duas redes.
-  assert.equal(runDuePosts(db), 0);
-  assert.equal(runDuePosts(db, new Date(Date.now() + 7200e3)), 1);
+  assert.equal(await runDuePosts(db), 0);
+  assert.equal(await runDuePosts(db, new Date(Date.now() + 7200e3)), 1);
   const published = (await api(`/brands/${brand.id}/posts/${post.id}`)).body;
   assert.equal(published.status, 'published');
   assert.ok(published.targets.every((t) => t.external_id));

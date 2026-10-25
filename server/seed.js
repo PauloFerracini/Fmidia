@@ -3,6 +3,8 @@ const { openDb, tx } = require('./db');
 const { hashPassword } = require('./auth');
 const { seedMetrics } = require('./metrics');
 
+const SAMPLE_VIDEO = 'https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4';
+
 function seed(db) {
   if (db.prepare('SELECT 1 FROM users WHERE email = ?').get('demo@fmidia.com')) return false;
   tx(db, () => {
@@ -55,11 +57,12 @@ function seed(db) {
         const target = profiles.filter((p) => !['tiktok', 'youtube'].includes(p.network) || i % 2 === 0);
         const format = target.some((p) => ['tiktok'].includes(p.network)) ? 'reels' : 'feed';
         const finalTargets = format === 'reels' ? profiles.filter((p) => ['instagram', 'tiktok', 'youtube', 'facebook'].includes(p.network)) : target.filter((p) => p.network !== 'tiktok');
+        const media = format === 'reels' ? SAMPLE_VIDEO : `https://picsum.photos/seed/fmidia${bi}${i}/800/800.jpg`;
         const postId = db.prepare(
-          `INSERT INTO posts (brand_id, author_id, caption, media_url, format, status, scheduled_at, published_at, approval_token)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          `INSERT INTO posts (brand_id, author_id, caption, media_url, media_urls, format, status, scheduled_at, published_at, approval_token)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).run(brandId, userId, captions[(i + bi) % captions.length],
-          `https://picsum.photos/seed/fmidia${bi}${i}/800/800`, format, status, when.toISOString(),
+          media, JSON.stringify([media]), format, status, when.toISOString(),
           status === 'published' ? when.toISOString() : null,
           status === 'pending_approval' ? `demo${bi}${i}` : null).lastInsertRowid;
         for (const p of finalTargets) {

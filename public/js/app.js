@@ -1,10 +1,14 @@
 /* Fmidia — painel (SPA com rotas em hash). */
-const state = { user: null, brands: [], brandId: null, networks: {}, formats: {}, profiles: [] };
+const state = { user: null, brands: [], brandId: null, networks: {}, formats: {}, live: {}, profiles: [] };
 
 const STATUS = {
   draft: 'Rascunho', pending_approval: 'Aguardando aprovação', approved: 'Aprovado', rejected: 'Ajustes solicitados',
-  scheduled: 'Agendado', published: 'Publicado', failed: 'Falhou',
+  scheduled: 'Agendado', publishing: 'Publicando', published: 'Publicado', failed: 'Falhou',
 };
+const isVideo = (url) => /\.(mp4|mov|m4v|webm)(\?|#|$)/i.test(String(url));
+const mediaTag = (url, cls = '', attrs = '') => (isVideo(url)
+  ? `<video class="${cls}" src="${esc(url)}" muted playsinline preload="metadata" ${attrs}></video>`
+  : `<img class="${cls}" src="${esc(url)}" alt="" loading="lazy" ${attrs}>`);
 const KIND = { comment: 'Comentário', message: 'Mensagem direta', mention: 'Menção' };
 
 const $ = (sel, el = document) => el.querySelector(sel);
@@ -57,7 +61,7 @@ const toLocalInput = (iso) => {
 /* ---------- Inicialização ---------- */
 async function init() {
   const [user, nets] = await Promise.all([api('/auth/me'), api('/networks')]);
-  state.user = user; state.networks = nets.networks; state.formats = nets.formats;
+  state.user = user; state.networks = nets.networks; state.formats = nets.formats; state.live = nets.live;
   $('#user-box').textContent = `${user.name} · ${user.email}`;
   $('#logout').onclick = async () => { await api('/auth/logout', { method: 'POST' }); location.href = '/'; };
   $('#menu-btn').onclick = () => $('#sidebar').classList.toggle('open');
@@ -113,11 +117,19 @@ function newBrandModal() {
 
 const ROUTES = {
   dashboard: renderDashboard, calendario: renderCalendar, posts: renderPosts, novo: renderComposer, editar: renderComposer,
-  inbox: renderInbox, relatorio: renderReport, perfis: renderProfiles, equipe: renderTeam,
+  inbox: renderInbox, relatorio: renderReport, perfis: renderProfiles, equipe: renderTeam, conectar: renderConnectPick,
 };
 
 async function route() {
-  const [name, arg] = (location.hash.replace(/^#\//, '') || 'dashboard').split('/');
+  const [path, query] = location.hash.replace(/^#\//, '').split('?');
+  const [name, arg] = (path || 'dashboard').split('/');
+  // Retorno do login OAuth: #/perfis?ok=... ou ?erro=...
+  if (query) {
+    const q = new URLSearchParams(query);
+    if (q.get('ok')) toast(`✓ ${q.get('ok')}`);
+    if (q.get('erro')) toast(`⚠ ${q.get('erro')}`);
+    history.replaceState(null, '', `#/${path}`);
+  }
   document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('active', a.getAttribute('href') === `#/${name}`));
   if (!state.brandId) {
     view().innerHTML = `<div class="card empty"><h2>Bem-vindo à Fmidia 👋</h2><p>Comece criando a primeira marca (cliente) que você vai gerenciar.</p>
@@ -177,9 +189,9 @@ async function renderDashboard() {
 /* ---------- Posts ---------- */
 function postRow(p) {
   return `<div class="post-item" style="padding:.8em 0;border-bottom:1px solid var(--border)">
-    ${p.media_url ? `<img class="thumb" src="${esc(p.media_url)}" alt="" loading="lazy">` : '<div class="thumb"></div>'}
+    ${p.media?.length ? mediaTag(p.media[0], 'thumb') : '<div class="thumb"></div>'}
     <div style="min-width:0"><div class="row" style="gap:.4em">${badge(p.status)} ${p.targets.map((t) => netIcon(t.network)).join('')}
-      <span class="hint">${esc(state.formats[p.format])} · ${dt(p.published_at || p.scheduled_at)}</span></div>
+      <span class="hint">${esc(state.formats[p.format])}${p.media?.length > 1 ? ` · ${p.media.length} mídias` : ''} · ${dt(p.published_at || p.scheduled_at)}</span></div>
       <div class="caption">${esc(p.caption)}</div>
       ${p.approval_comment ? `<div class="hint">💬 Cliente: ${esc(p.approval_comment)}</div>` : ''}
       ${p.targets.filter((t) => t.error).map((t) => `<div class="hint" style="color:var(--danger)">⚠ ${esc(t.handle)}: ${esc(t.error)}</div>`).join('')}</div>
@@ -201,15 +213,18 @@ async function openPost(id) {
     if (['draft', 'approved', 'failed'].includes(p.status) && p.scheduled_at) actions.push('<button class="btn primary" data-act="schedule">Agendar</button>');
     if (['draft', 'approved', 'failed'].includes(p.status)) actions.push('<button class="btn" data-act="now">Publicar agora</button>');
     if (p.status === 'scheduled') actions.push('<button class="btn" data-act="unschedule">Cancelar agendamento</button>');
-    actions.push('<button class="btn danger" data-act="delete">Excluir</button>');
+    if (p.status !== 'publishing') actions.push('<button class="btn danger" data-act="delete">Excluir</button>');
   }
   const link = p.approval_token ? `${location.origin}/aprovar.html?t=${p.approval_token}` : null;
   const m = modal(`
     <div class="row">${badge(p.status)}<span class="hint">${esc(state.formats[p.format])}</span><span class="spacer"></span><button class="btn small" data-close>✕</button></div>
     <p class="muted" style="margin:.6em 0">${p.published_at ? 'Publicado em ' + dt(p.published_at) : p.scheduled_at ? 'Agendado para ' + dt(p.scheduled_at) : 'Sem data'}</p>
-    ${p.media_url ? `<img src="${esc(p.media_url)}" alt="" style="border-radius:12px;width:100%;max-height:320px;object-fit:cover">` : ''}
+    ${p.media.length ? `<div class="media-strip">${p.media.map((u) => mediaTag(u, '', isVideo(u) ? 'controls' : '')).join('')}</div>` : ''}
     <p style="white-space:pre-wrap">${esc(p.caption)}</p>
-    <div class="row" style="gap:.4em;margin-bottom:1em">${p.targets.map((t) => `${netIcon(t.network)} <span class="hint">${esc(t.handle)}${t.external_id ? ' ✓' : ''}${t.error ? ' ⚠ ' + esc(t.error) : ''}</span>`).join(' ')}</div>
+    <div style="margin-bottom:1em">${p.targets.map((t) => `<div class="row" style="gap:.4em;margin:.25em 0">${netIcon(t.network)}
+      <span class="hint">${esc(t.handle)}${t.mode === 'live' ? '' : ' (demonstração)'}</span>
+      ${t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">ver na rede ↗</a>` : t.external_id ? '<span class="hint">✓ publicado</span>' : ''}
+      ${t.error ? `<span class="hint" style="color:var(--danger)">⚠ ${esc(t.error)}</span>` : ''}</div>`).join('')}</div>
     ${p.approval_comment ? `<p class="reply"><strong>Comentário do cliente:</strong> ${esc(p.approval_comment)}</p>` : ''}
     ${link && p.status === 'pending_approval' ? `<div class="field"><label>Link de aprovação para o cliente</label><div class="row"><input readonly value="${esc(link)}" id="alink"><button class="btn small" id="copy">Copiar</button></div></div>` : ''}
     <p class="error-msg"></p>
@@ -311,14 +326,17 @@ async function renderComposer(editId) {
     <div class="grid composer">
       <form class="card" id="composer">
         <div class="field"><label>Publicar em</label><div class="profile-pick">
-          ${state.profiles.map((p) => `<label><input type="checkbox" name="profile" value="${p.id}" data-net="${p.network}" ${selected.has(p.id) ? 'checked' : ''}>${netIcon(p.network)}${esc(p.handle)}</label>`).join('')}
+          ${state.profiles.map((p) => `<label title="${p.mode === 'live' ? 'Conta real' : 'Demonstração'}"><input type="checkbox" name="profile" value="${p.id}" data-net="${p.network}" ${selected.has(p.id) ? 'checked' : ''} ${p.status === 'reauth' ? 'disabled' : ''}>${netIcon(p.network)}${esc(p.handle)}${p.status === 'reauth' ? ' <span class="badge failed">reconectar</span>' : ''}</label>`).join('')}
         </div></div>
         <div class="field"><label for="format">Formato</label><select id="format" name="format">
           ${Object.entries(state.formats).map(([k, v]) => `<option value="${k}" ${post?.format === k ? 'selected' : ''}>${v}</option>`).join('')}</select></div>
         <div class="field"><label for="caption">Legenda</label><textarea id="caption" name="caption" placeholder="Escreva a legenda, hashtags e menções…">${esc(post?.caption || '')}</textarea>
           <div class="hint" id="limits"></div></div>
-        <div class="field"><label for="media">URL da imagem ou vídeo</label><input id="media" name="media" type="url" placeholder="https://…" value="${esc(post?.media_url || '')}">
-          <div class="hint">Cole o link público da mídia. <a href="#" id="sample">Usar imagem de exemplo</a></div></div>
+        <div class="field"><label for="media">Imagens ou vídeos <span class="hint">(um link por linha; no carrossel, na ordem de exibição)</span></label>
+          <textarea id="media" name="media" style="min-height:70px" placeholder="https://…/foto.jpg">${esc((post?.media || []).join('\n'))}</textarea>
+          <div class="row" style="margin-top:.4em"><label class="btn small" style="margin:0">⬆ Enviar arquivos<input type="file" id="upload" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" multiple hidden></label>
+            <span class="hint" id="upload-status"></span><span class="spacer"></span><a href="#" id="sample" class="hint">Usar imagem de exemplo</a></div>
+          <div class="hint">Instagram aceita imagens só em JPEG. Vídeos: MP4 ou MOV. As redes baixam a mídia pelo link, então ele precisa ser público.</div></div>
         <div class="field"><label for="when">Data e hora da publicação</label><input id="when" name="when" type="datetime-local" value="${post ? toLocalInput(post.scheduled_at) : defaultDate}"></div>
         <p class="error-msg" id="err"></p>
         <div class="row">
@@ -346,11 +364,29 @@ async function renderComposer(editId) {
     $('#pv-text').textContent = caption || 'Sua legenda aparece aqui.';
     const first = state.profiles.find((p) => p.id === Number(picked[0]?.value));
     $('#pv-handle').textContent = first ? first.handle : brand().name;
-    const url = $('#media').value;
-    $('#pv-media').innerHTML = url ? `<img src="${esc(url)}" alt="" onerror="this.replaceWith('Não foi possível carregar a mídia')">` : 'Sem mídia';
+    const media = mediaList();
+    $('#pv-media').innerHTML = media.length
+      ? mediaTag(media[0], '', isVideo(media[0]) ? 'controls' : 'onerror="this.replaceWith(\'Não foi possível carregar a mídia\')"') + (media.length > 1 ? `<span class="media-count">1/${media.length}</span>` : '')
+      : 'Sem mídia';
   };
+  const mediaList = () => $('#media').value.split('\n').map((u) => u.trim()).filter(Boolean);
+  const addMedia = (url) => { $('#media').value = [...mediaList(), url].join('\n'); update(); };
   form.addEventListener('input', update);
-  $('#sample').onclick = (e) => { e.preventDefault(); $('#media').value = `https://picsum.photos/seed/${Date.now()}/800/800`; update(); };
+  $('#sample').onclick = (e) => { e.preventDefault(); addMedia(`https://picsum.photos/seed/${Date.now()}/1080/1080.jpg`); };
+  $('#upload').onchange = async (e) => {
+    const files = [...e.target.files];
+    for (const [i, file] of files.entries()) {
+      $('#upload-status').textContent = `Enviando ${i + 1} de ${files.length}…`;
+      try {
+        const res = await fetch(`/api/brands/${state.brandId}/media`, { method: 'POST', headers: { 'Content-Type': file.type }, body: file });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        addMedia(data.url);
+      } catch (err) { toast(`${file.name}: ${err.message}`); }
+    }
+    $('#upload-status').textContent = '';
+    e.target.value = '';
+  };
   update();
 
   let then = 'draft';
@@ -362,7 +398,7 @@ async function renderComposer(editId) {
     if (then === 'schedule' && !when) return ($('#err').textContent = 'Defina a data e hora para agendar');
     if (then === 'schedule' && new Date(when) < new Date()) return ($('#err').textContent = 'A data precisa estar no futuro');
     const body = {
-      caption: $('#caption').value, mediaUrl: $('#media').value || null, format: $('#format').value,
+      caption: $('#caption').value, mediaUrls: mediaList(), format: $('#format').value,
       scheduledAt: when ? new Date(when).toISOString() : null,
       profileIds: [...form.querySelectorAll('[name=profile]:checked')].map((i) => Number(i.value)),
     };
@@ -391,6 +427,7 @@ async function renderInbox() {
         ${netIcon(i.network)}
         <div><div class="row" style="gap:.5em"><strong class="who">@${esc(i.author)}</strong><span class="badge">${KIND[i.kind]}</span><span class="hint">em ${esc(i.handle)} · ${dt(i.created_at)}</span></div>
           <div>${esc(i.body)}</div>
+          ${i.context ? `<div class="hint">no post: “${esc(i.context)}”</div>` : ''}
           ${i.reply ? `<div class="reply"><strong>Sua resposta:</strong> ${esc(i.reply)} <span class="hint">· ${dt(i.replied_at)}</span></div>`
             : canEdit() ? `<form class="reply-box"><input placeholder="Escreva uma resposta…" required><button class="btn primary small">Responder</button></form>` : ''}
         </div></div>`).join('') : '<p class="empty">Tudo respondido por aqui 🎉</p>'}</div>`;
@@ -438,33 +475,91 @@ async function renderReport() {
 }
 
 /* ---------- Perfis ---------- */
+const LIVE_BUTTONS = [
+  { provider: 'meta', label: 'Conectar Facebook e Instagram', nets: ['facebook', 'instagram'],
+    hint: 'Entre com o Facebook e escolha as Páginas e contas profissionais do Instagram vinculadas a elas.' },
+  { provider: 'tiktok', label: 'Conectar TikTok', nets: ['tiktok'], hint: 'Entre com a conta do TikTok que vai publicar.' },
+];
+
 async function renderProfiles() {
   await refreshBrandData();
+  const liveNets = new Set(LIVE_BUTTONS.filter((b) => state.live[b.provider]).flatMap((b) => b.nets));
   view().innerHTML = `
     <div class="page-head"><h1>Perfis conectados</h1></div>
     <div class="card" style="margin-bottom:1em">
-      ${state.profiles.length ? `<div class="table-wrap"><table><thead><tr><th>Rede</th><th>Perfil</th><th class="num">Seguidores</th><th>Conectado em</th><th></th></tr></thead><tbody>
-        ${state.profiles.map((p) => `<tr><td><div class="row" style="gap:.4em">${netIcon(p.network)} ${esc(state.networks[p.network]?.label)}</div></td><td>${esc(p.handle)}</td><td class="num">${num(p.followers)}</td><td>${dt(p.connected_at, { dateStyle: 'short' })}</td>
-        <td>${canEdit() ? `<button class="btn small danger" data-del="${p.id}">Desconectar</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`
+      ${state.profiles.length ? `<div class="table-wrap"><table class="profiles-table"><thead><tr><th>Rede</th><th>Perfil</th><th class="num">Seguidores</th><th>Situação</th><th></th></tr></thead><tbody>
+        ${state.profiles.map((p) => `<tr><td><div class="row" style="gap:.4em">${netIcon(p.network)} <span class="net-label">${esc(state.networks[p.network]?.label)}</span></div></td>
+        <td><div class="row" style="gap:.5em">${p.avatar_url ? `<img src="${esc(p.avatar_url)}" alt="" class="avatar-sm">` : ''}<div>${esc(p.handle)}${p.display_name && p.display_name !== p.handle ? `<div class="hint">${esc(p.display_name)}</div>` : ''}</div></div></td>
+        <td class="num">${num(p.followers)}</td>
+        <td>${p.mode !== 'live' ? '<span class="badge">Demonstração</span>'
+          : p.status === 'reauth' ? '<span class="badge failed">Reconectar</span>' : '<span class="badge published">Conectado</span>'}
+          ${p.last_error ? `<div class="hint" style="color:var(--danger);max-width:280px">${esc(p.last_error)}</div>` : p.last_synced_at ? `<div class="hint">sincronizado ${dt(p.last_synced_at)}</div>` : ''}</td>
+        <td><div class="row" style="gap:.4em;justify-content:flex-end">${canEdit() ? `
+          ${p.mode === 'live' && p.status === 'reauth' ? `<a class="btn small primary" href="/api/oauth/${p.network === 'tiktok' ? 'tiktok' : 'meta'}/start?brandId=${state.brandId}">Reconectar</a>` : ''}
+          ${p.mode === 'live' && p.status !== 'reauth' ? `<button class="btn small" data-sync="${p.id}">Sincronizar</button>` : ''}
+          <button class="btn small danger" data-del="${p.id}">Desconectar</button>` : ''}</div></td></tr>`).join('')}</tbody></table></div>`
         : '<p class="empty">Nenhum perfil conectado.</p>'}
     </div>
-    ${canEdit() ? `<div class="card"><h3>Conectar nova rede</h3>
+    ${canEdit() ? `<div class="grid features" style="margin-bottom:1em">${LIVE_BUTTONS.map((b) => `
+      <div class="card"><div class="row" style="gap:.4em;margin-bottom:.5em">${b.nets.map(netIcon).join('')}<h3 style="margin:0">${b.nets.map((n) => state.networks[n].label).join(' + ')}</h3></div>
+        <p class="hint">${b.hint}</p>
+        ${state.live[b.provider] ? `<a class="btn primary" href="/api/oauth/${b.provider}/start?brandId=${state.brandId}">${b.label}</a>`
+          : '<p class="hint" style="color:var(--warning)">Integração ainda não configurada no servidor (veja o README).</p>'}
+      </div>`).join('')}</div>
+    <div class="card"><h3>Adicionar perfil de demonstração</h3>
       <form id="connect" class="row" style="align-items:end">
-        <div style="flex:1;min-width:180px"><label>Rede</label><select name="network">${Object.entries(state.networks).map(([k, n]) => `<option value="${k}">${n.label}</option>`).join('')}</select></div>
+        <div style="flex:1;min-width:180px"><label>Rede</label><select name="network">${Object.entries(state.networks).map(([k, n]) => `<option value="${k}">${n.label}${liveNets.has(k) ? '' : ' (demonstração)'}</option>`).join('')}</select></div>
         <div style="flex:2;min-width:200px"><label>@ do perfil</label><input name="handle" placeholder="@suamarca" required></div>
-        <button class="btn primary">Conectar</button>
+        <button class="btn">Adicionar</button>
       </form><p class="error-msg"></p>
-      <p class="hint">Modo demonstração: a conexão é simulada e gera métricas de exemplo. Para publicar de verdade, configure as credenciais OAuth de cada rede (veja o README).</p></div>` : ''}`;
+      <p class="hint">Perfis de demonstração não publicam de verdade: servem para testar o fluxo com métricas de exemplo.</p></div>` : ''}`;
   $('#connect')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const f = new FormData(e.target);
-    try { await bapi('/profiles', { method: 'POST', body: { network: f.get('network'), handle: f.get('handle') } }); toast('Perfil conectado'); renderProfiles(); }
+    try { await bapi('/profiles', { method: 'POST', body: { network: f.get('network'), handle: f.get('handle') } }); toast('Perfil adicionado'); renderProfiles(); }
     catch (err) { $('.error-msg', view()).textContent = err.message; }
   });
+  view().querySelectorAll('[data-sync]').forEach((b) => (b.onclick = async () => {
+    b.disabled = true; b.textContent = 'Sincronizando…';
+    try { const r = await bapi(`/profiles/${b.dataset.sync}/sync`, { method: 'POST' }); toast(`Sincronizado · ${r.newComments} comentário(s) novo(s)`); }
+    catch (err) { toast(err.message); }
+    renderProfiles();
+  }));
   view().querySelectorAll('[data-del]').forEach((b) => (b.onclick = async () => {
-    if (!confirm('Desconectar este perfil? Os dados de métricas dele serão removidos.')) return;
+    if (!confirm('Desconectar este perfil? As métricas dele serão removidas da Fmidia.')) return;
     await bapi(`/profiles/${b.dataset.del}`, { method: 'DELETE' }); toast('Perfil desconectado'); renderProfiles();
   }));
+}
+
+// Depois do login na Meta: o usuário escolhe quais Páginas/contas do Instagram conectar.
+async function renderConnectPick(pendingId) {
+  const p = await api(`/oauth/pending/${pendingId}`);
+  if (p.brandId !== state.brandId) {
+    state.brandId = p.brandId;
+    $('#brand-select').value = p.brandId;
+    $('#brand-dot').style.background = brand()?.color;
+  }
+  view().innerHTML = `
+    <div class="page-head"><h1>Escolha as contas</h1></div>
+    <form class="card" id="pick">
+      <p class="muted">Encontramos estas contas no seu login. Marque as que serão gerenciadas em <strong>${esc(brand().name)}</strong>.</p>
+      ${p.accounts.map((a) => `<label class="pick-row"><input type="checkbox" value="${a.index}" ${a.connected ? '' : 'checked'}>
+        ${a.avatarUrl ? `<img src="${esc(a.avatarUrl)}" alt="" class="avatar-sm">` : netIcon(a.network)}
+        <span><strong>${esc(a.handle)}</strong> <span class="hint">${esc(state.networks[a.network].label)}${a.pageName ? ` · Página ${esc(a.pageName)}` : ''} · ${num(a.followers)} seguidores</span>
+        ${a.connected ? '<span class="badge published">já conectada</span>' : ''}</span></label>`).join('')}
+      <p class="hint">Não apareceu um Instagram? Ele precisa ser conta profissional (Empresa ou Criador) vinculada a uma Página do Facebook, e você precisa ter acesso a essa Página.</p>
+      <p class="error-msg"></p>
+      <div class="row"><button class="btn primary">Conectar selecionadas</button><a class="btn" href="#/perfis">Cancelar</a></div>
+    </form>`;
+  $('#pick').onsubmit = async (e) => {
+    e.preventDefault();
+    const indexes = [...e.target.querySelectorAll('input:checked')].map((i) => Number(i.value));
+    try {
+      const r = await api(`/oauth/pending/${pendingId}`, { method: 'POST', body: { indexes } });
+      toast(`${r.connected} conta(s) conectada(s). Buscando métricas…`);
+      location.hash = '#/perfis';
+    } catch (err) { $('.error-msg', view()).textContent = err.message; }
+  };
 }
 
 /* ---------- Equipe e marca ---------- */

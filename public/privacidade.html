@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet"><link rel="stylesheet" href="/css/styles.css">
+<title>Política de Privacidade — Fmidia</title>
+</head>
+<body>
+<header class="site-header"><div class="container"><a class="logo" href="/"><span class="logo-mark">F</span>Fmidia</a><span class="spacer"></span><a class="btn" href="/entrar">Entrar</a></div></header>
+<main class="container legal">
+  <p class="badge" id="exclusao" hidden></p>
+  <h1>Política de Privacidade</h1>
+  <p class="muted">Este é um modelo. Revise com seu jurídico e preencha os dados da empresa responsável antes de publicar.</p>
+
+  <h2>Quem somos</h2>
+  <p>A Fmidia é uma ferramenta de gestão de redes sociais operada por <strong>[razão social, CNPJ e endereço]</strong>. Contato do encarregado de dados (DPO): <strong>[e-mail]</strong>.</p>
+
+  <h2>Dados que coletamos</h2>
+  <ul>
+    <li><strong>Conta Fmidia:</strong> nome, e-mail e senha (guardada apenas como hash).</li>
+    <li><strong>Redes conectadas (Facebook, Instagram, TikTok):</strong> identificador da conta, nome de usuário, nome de exibição, foto de perfil, número de seguidores, métricas de desempenho, posts publicados pela Fmidia e comentários recebidos nesses posts.</li>
+    <li><strong>Tokens de acesso</strong> concedidos por você no login de cada rede, guardados de forma cifrada.</li>
+    <li><strong>Conteúdo</strong> que você cria na Fmidia: legendas, imagens, vídeos e agendamentos.</li>
+  </ul>
+
+  <h2>Como usamos</h2>
+  <p>Usamos os dados apenas para prestar o serviço que você solicitou: publicar e agendar conteúdo nas contas que você conectou, exibir métricas e relatórios, e mostrar e responder comentários. Não vendemos dados nem os usamos para publicidade.</p>
+
+  <h2>Compartilhamento</h2>
+  <p>Os dados são enviados às próprias redes sociais (Meta e TikTok) quando você publica ou responde por meio da Fmidia, e a provedores de infraestrutura que hospedam o serviço.</p>
+
+  <h2>Retenção e exclusão</h2>
+  <p>Ao desconectar um perfil na Fmidia, apagamos os tokens e as métricas dele. Você também pode remover o acesso da Fmidia nas configurações da Meta ("Integrações comerciais") ou do TikTok ("Gerenciar apps"); nesse caso recebemos o pedido de exclusão e apagamos os dados da conta. Para excluir sua conta Fmidia, escreva para <strong>[e-mail]</strong>.</p>
+
+  <h2>Seus direitos (LGPD)</h2>
+  <p>Você pode pedir acesso, correção, portabilidade ou exclusão dos seus dados, e revogar consentimentos, pelo contato acima.</p>
+
+  <p class="muted">Última atualização: [data].</p>
+</main>
+<script>
+const code = new URLSearchParams(location.search).get('exclusao');
+if (code) { const el = document.getElementById('exclusao'); el.hidden = false; el.textContent = 'Pedido de exclusão recebido. Código de confirmação: ' + code; }
+</script>
+</body>
+</html>

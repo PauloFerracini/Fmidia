@@ -6,8 +6,8 @@
   "type": "commonjs",
   "engines": { "node": ">=22.13" },
   "scripts": {
-    "start": "node --no-warnings server/index.js",
-    "dev": "node --no-warnings --watch server/index.js",
+    "start": "node --no-warnings --env-file-if-exists=.env server/index.js",
+    "dev": "node --no-warnings --env-file-if-exists=.env --watch server/index.js",
     "seed": "node --no-warnings server/seed.js",
     "test": "node --no-warnings --test test/*.test.js"
   },

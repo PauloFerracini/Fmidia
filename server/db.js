@@ -88,11 +88,91 @@ CREATE TABLE IF NOT EXISTS inbox (
 );
 `;
 
+// Cada migração roda uma única vez, controlada por PRAGMA user_version.
+const MIGRATIONS = [
+  // 1: integração real com as redes (tokens OAuth, mídia múltipla, status "publishing", IDs externos).
+  `CREATE TABLE posts_new (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+     author_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+     caption TEXT NOT NULL,
+     media_url TEXT,
+     media_urls TEXT NOT NULL DEFAULT '[]',
+     format TEXT NOT NULL DEFAULT 'feed',
+     status TEXT NOT NULL CHECK (status IN ('draft','pending_approval','approved','rejected','scheduled','publishing','published','failed')),
+     scheduled_at TEXT,
+     published_at TEXT,
+     approval_token TEXT UNIQUE,
+     approval_comment TEXT,
+     created_at TEXT NOT NULL DEFAULT (datetime('now'))
+   );
+   INSERT INTO posts_new (id, brand_id, author_id, caption, media_url, media_urls, format, status, scheduled_at, published_at, approval_token, approval_comment, created_at)
+     SELECT id, brand_id, author_id, caption, media_url, CASE WHEN media_url IS NULL THEN '[]' ELSE json_array(media_url) END,
+            format, status, scheduled_at, published_at, approval_token, approval_comment, created_at FROM posts;
+   DROP TABLE posts;
+   ALTER TABLE posts_new RENAME TO posts;
+
+   ALTER TABLE profiles ADD COLUMN mode TEXT NOT NULL DEFAULT 'simulated';
+   ALTER TABLE profiles ADD COLUMN external_id TEXT;
+   ALTER TABLE profiles ADD COLUMN display_name TEXT;
+   ALTER TABLE profiles ADD COLUMN avatar_url TEXT;
+   ALTER TABLE profiles ADD COLUMN access_token TEXT;
+   ALTER TABLE profiles ADD COLUMN refresh_token TEXT;
+   ALTER TABLE profiles ADD COLUMN token_expires_at TEXT;
+   ALTER TABLE profiles ADD COLUMN refresh_expires_at TEXT;
+   ALTER TABLE profiles ADD COLUMN status TEXT NOT NULL DEFAULT 'active';
+   ALTER TABLE profiles ADD COLUMN last_error TEXT;
+   ALTER TABLE profiles ADD COLUMN meta TEXT NOT NULL DEFAULT '{}';
+   ALTER TABLE profiles ADD COLUMN last_synced_at TEXT;
+   CREATE UNIQUE INDEX profiles_live_unique ON profiles (brand_id, network, external_id) WHERE external_id IS NOT NULL;
+
+   ALTER TABLE post_targets ADD COLUMN url TEXT;
+
+   ALTER TABLE inbox ADD COLUMN external_id TEXT;
+   ALTER TABLE inbox ADD COLUMN context TEXT;
+   CREATE UNIQUE INDEX inbox_external_unique ON inbox (profile_id, external_id) WHERE external_id IS NOT NULL;
+
+   CREATE TABLE oauth_states (
+     state TEXT PRIMARY KEY,
+     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+     provider TEXT NOT NULL,
+     verifier TEXT,
+     created_at TEXT NOT NULL
+   );
+
+   -- Contas retornadas por um login OAuth aguardando o usuário escolher quais conectar.
+   CREATE TABLE oauth_pending (
+     id TEXT PRIMARY KEY,
+     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+     accounts TEXT NOT NULL,
+     created_at TEXT NOT NULL
+   );`,
+];
+
+function migrate(db) {
+  let version = db.prepare('PRAGMA user_version').get().user_version;
+  for (; version < MIGRATIONS.length; version++) {
+    // Recriar tabelas com foreign_keys ligado apagaria filhos em cascata.
+    db.exec('PRAGMA foreign_keys = OFF');
+    try {
+      tx(db, () => {
+        db.exec(MIGRATIONS[version]);
+        db.exec(`PRAGMA user_version = ${version + 1}`);
+      });
+    } finally {
+      db.exec('PRAGMA foreign_keys = ON');
+    }
+  }
+}
+
 function openDb(file = process.env.FMIDIA_DB || path.join(__dirname, '..', 'data', 'fmidia.db')) {
   if (file !== ':memory:') fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
   db.exec(SCHEMA);
+  migrate(db);
   return db;
 }
 

@@ -21,7 +21,9 @@ async function load() {
   root.innerHTML =
     '<div class="row"><span class="brand-dot" style="background:' + esc(p.brand_color) + '"></span><strong>' + esc(p.brand_name) + '</strong><span class="spacer"></span><span class="badge ' + p.status + '">' + (STATUS[p.status] || p.status) + '</span></div>' +
     '<p class="muted" style="margin:.5em 0 1em">Publicação prevista: ' + esc(when) + '<br>Em: ' + p.targets.map(t => esc(t.network) + ' ' + esc(t.handle)).join(', ') + '</p>' +
-    (p.media_url ? '<img src="' + esc(p.media_url) + '" alt="" style="border-radius:12px;width:100%;aspect-ratio:1;object-fit:cover">' : '') +
+    p.media.map(u => /\.(mp4|mov|m4v|webm)(\?|#|$)/i.test(u)
+      ? '<video src="' + esc(u) + '" controls playsinline style="border-radius:12px;width:100%;margin-bottom:.5em"></video>'
+      : '<img src="' + esc(u) + '" alt="" style="border-radius:12px;width:100%;aspect-ratio:1;object-fit:cover;margin-bottom:.5em">').join('') +
     '<p style="white-space:pre-wrap">' + esc(p.caption) + '</p>' +
     (p.approval_comment ? '<p class="reply"><strong>Comentário:</strong> ' + esc(p.approval_comment) + '</p>' : '') +
     (p.status === 'pending_approval' ?
