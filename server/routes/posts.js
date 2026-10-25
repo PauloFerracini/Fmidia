@@ -1,7 +1,7 @@
 const crypto = require('node:crypto');
 const express = require('express');
 const { requireBrand } = require('../auth');
-const { NETWORKS, FORMATS, checkMedia } = require('../networks');
+const { NETWORKS, FORMATS, checkMedia, isVideo, tiktokOptions } = require('../networks');
 const { tx } = require('../db');
 
 const EDITABLE = ['draft', 'rejected', 'approved', 'scheduled', 'failed'];
@@ -12,9 +12,9 @@ function loadPost(db, brandId, postId) {
   post.media = JSON.parse(post.media_urls || '[]');
   delete post.media_urls;
   post.targets = db.prepare(
-    `SELECT p.id, p.network, p.handle, p.mode, t.external_id, t.url, t.error
+    `SELECT p.id, p.network, p.handle, p.mode, t.external_id, t.url, t.error, t.options
      FROM post_targets t JOIN profiles p ON p.id = t.profile_id WHERE t.post_id = ?`
-  ).all(post.id);
+  ).all(post.id).map((t) => ({ ...t, options: JSON.parse(t.options || '{}') }));
   return post;
 }
 
@@ -25,7 +25,7 @@ function mediaFrom(body) {
 }
 
 // Valida legenda/formato contra cada rede escolhida. Retorna mensagem de erro ou null.
-function validate(db, brandId, { caption, format, profileIds, scheduledAt, media }) {
+function validate(db, brandId, { caption, format, profileIds, scheduledAt, media, tiktok }, targetOptions) {
   if (!caption?.trim()) return 'Escreva a legenda do post';
   if (!FORMATS[format]) return 'Formato inválido';
   if (!Array.isArray(profileIds) || profileIds.length === 0) return 'Selecione ao menos um perfil';
@@ -41,6 +41,11 @@ function validate(db, brandId, { caption, format, profileIds, scheduledAt, media
     if (!net.formats.includes(format)) return `${net.label} não aceita o formato ${FORMATS[format]}`;
     const mediaError = checkMedia(p.network, format, media);
     if (mediaError) return mediaError;
+    if (p.network === 'tiktok') {
+      const r = tiktokOptions(tiktok?.[id], { photo: !isVideo(media[0]) });
+      if (r.error) return `${p.handle}: ${r.error}`;
+      targetOptions.set(Number(id), r.options);
+    }
   }
   return null;
 }
@@ -68,15 +73,16 @@ module.exports = function postRoutes(db) {
   r.post('/', requireBrand(db, 'editor'), (req, res) => {
     const body = { format: 'feed', ...req.body };
     body.media = mediaFrom(body);
-    const error = validate(db, req.brandId, body);
+    const options = new Map();
+    const error = validate(db, req.brandId, body, options);
     if (error) return res.status(400).json({ error });
     const id = tx(db, () => {
       const { lastInsertRowid } = db.prepare(
         "INSERT INTO posts (brand_id, author_id, caption, media_url, media_urls, format, status, scheduled_at) VALUES (?, ?, ?, ?, ?, ?, 'draft', ?)"
       ).run(req.brandId, req.user.id, body.caption.trim(), body.media[0] || null, JSON.stringify(body.media), body.format,
         body.scheduledAt ? new Date(body.scheduledAt).toISOString() : null);
-      const ins = db.prepare('INSERT INTO post_targets (post_id, profile_id) VALUES (?, ?)');
-      for (const pid of new Set(body.profileIds.map(Number))) ins.run(lastInsertRowid, pid);
+      const ins = db.prepare('INSERT INTO post_targets (post_id, profile_id, options) VALUES (?, ?, ?)');
+      for (const pid of new Set(body.profileIds.map(Number))) ins.run(lastInsertRowid, pid, JSON.stringify(options.get(pid) || {}));
       return Number(lastInsertRowid);
     });
     res.status(201).json(loadPost(db, req.brandId, id));
@@ -88,10 +94,12 @@ module.exports = function postRoutes(db) {
     if (!EDITABLE.includes(post.status)) return res.status(409).json({ error: 'Este post não pode mais ser editado' });
     const body = {
       caption: post.caption, mediaUrls: post.media, format: post.format,
-      scheduledAt: post.scheduled_at, profileIds: post.targets.map((t) => t.id), ...req.body,
+      scheduledAt: post.scheduled_at, profileIds: post.targets.map((t) => t.id),
+      tiktok: Object.fromEntries(post.targets.map((t) => [t.id, t.options])), ...req.body,
     };
     body.media = mediaFrom(body);
-    const error = validate(db, req.brandId, body);
+    const options = new Map();
+    const error = validate(db, req.brandId, body, options);
     if (error) return res.status(400).json({ error });
     tx(db, () => {
       // Editar volta o post para rascunho: precisa ser reagendado/reaprovado.
@@ -103,7 +111,11 @@ module.exports = function postRoutes(db) {
       const keep = new Set(body.profileIds.map(Number));
       for (const t of post.targets) if (!keep.has(t.id)) db.prepare('DELETE FROM post_targets WHERE post_id = ? AND profile_id = ?').run(post.id, t.id);
       const ins = db.prepare('INSERT OR IGNORE INTO post_targets (post_id, profile_id) VALUES (?, ?)');
-      for (const pid of keep) ins.run(post.id, pid);
+      const setOptions = db.prepare('UPDATE post_targets SET options = ? WHERE post_id = ? AND profile_id = ?');
+      for (const pid of keep) {
+        ins.run(post.id, pid);
+        setOptions.run(JSON.stringify(options.get(pid) || {}), post.id, pid);
+      }
     });
     res.json(loadPost(db, req.brandId, post.id));
   });

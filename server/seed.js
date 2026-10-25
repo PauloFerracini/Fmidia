@@ -66,8 +66,9 @@ function seed(db) {
           status === 'published' ? when.toISOString() : null,
           status === 'pending_approval' ? `demo${bi}${i}` : null).lastInsertRowid;
         for (const p of finalTargets) {
-          db.prepare('INSERT INTO post_targets (post_id, profile_id, external_id) VALUES (?, ?, ?)')
-            .run(postId, p.id, status === 'published' ? `${p.network}_demo${postId}` : null);
+          const options = p.network === 'tiktok' ? { privacy: 'PUBLIC_TO_EVERYONE', allowComment: true, allowDuet: true, allowStitch: true } : {};
+          db.prepare('INSERT INTO post_targets (post_id, profile_id, external_id, options) VALUES (?, ?, ?, ?)')
+            .run(postId, p.id, status === 'published' ? `${p.network}_demo${postId}` : null, JSON.stringify(options));
         }
       }
 

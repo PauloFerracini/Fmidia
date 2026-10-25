@@ -12,7 +12,6 @@ const config = {
   tiktok: () => ({
     clientKey: env('TIKTOK_CLIENT_KEY'),
     clientSecret: env('TIKTOK_CLIENT_SECRET'),
-    privacy: env('TIKTOK_PRIVACY', 'PUBLIC_TO_EVERYONE'),
   }),
   pollMs: () => Number(env('FMIDIA_POLL_MS', 3000)),
   publishTimeoutMs: () => Number(env('FMIDIA_PUBLISH_TIMEOUT_MS', 5 * 60_000)),

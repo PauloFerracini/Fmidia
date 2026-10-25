@@ -73,19 +73,56 @@ async function account(tokens) {
   };
 }
 
-async function publish(profile, post, token) {
-  const creator = await api('/v2/post/publish/creator_info/query/', token, { json: {} });
-  const options = creator.privacy_level_options || [];
-  const wanted = config.tiktok().privacy;
-  const privacy = options.includes(wanted) ? wanted : options.includes('SELF_ONLY') ? 'SELF_ONLY' : options[0];
-  if (!privacy) throw new IntegrationError('A conta do TikTok não está habilitada para publicar agora');
-  const common = { privacy_level: privacy, disable_comment: Boolean(creator.comment_disabled) };
+// Mensagens dos bloqueios que o creator_info pode retornar.
+const CREATOR_BLOCKS = {
+  spam_risk_too_many_posts: 'Esta conta atingiu o limite diário de publicações pela API. Tente mais tarde.',
+  spam_risk_user_banned_from_posting: 'Esta conta está impedida de publicar pelo TikTok.',
+  reached_active_user_cap: 'O app atingiu o limite diário de contas publicando. Tente mais tarde.',
+};
+
+// Dados que a tela de publicação precisa mostrar (conta, privacidades permitidas, interações).
+async function creatorInfo(token) {
+  try {
+    const c = await api('/v2/post/publish/creator_info/query/', token, { json: {} });
+    return {
+      nickname: c.creator_nickname || null,
+      username: c.creator_username || null,
+      avatarUrl: c.creator_avatar_url || null,
+      privacyOptions: c.privacy_level_options || [],
+      commentDisabled: Boolean(c.comment_disabled),
+      duetDisabled: Boolean(c.duet_disabled),
+      stitchDisabled: Boolean(c.stitch_disabled),
+      maxVideoDurationSec: c.max_video_post_duration_sec || null,
+    };
+  } catch (err) {
+    if (CREATOR_BLOCKS[err.code]) throw new IntegrationError(CREATOR_BLOCKS[err.code], { code: err.code, status: err.status });
+    throw err;
+  }
+}
+
+async function publish(profile, post, token, options = {}) {
+  const creator = await creatorInfo(token);
+  // A privacidade é escolhida pelo usuário no editor; o TikTok pode ter mudado as opções da conta desde então.
+  if (!options.privacy) throw new IntegrationError('Escolha a privacidade do post no TikTok antes de publicar');
+  if (!creator.privacyOptions.includes(options.privacy)) {
+    throw new IntegrationError('A privacidade escolhida não está mais disponível para esta conta. Edite o post e escolha outra.');
+  }
+  const common = {
+    privacy_level: options.privacy,
+    disable_comment: creator.commentDisabled || !options.allowComment,
+    brand_content_toggle: Boolean(options.brandedContent),
+    brand_organic_toggle: Boolean(options.yourBrand),
+  };
 
   let init;
   if (isVideo(post.media[0])) {
     init = await api('/v2/post/publish/video/init/', token, {
       json: {
-        post_info: { ...common, title: post.caption, disable_duet: Boolean(creator.duet_disabled), disable_stitch: Boolean(creator.stitch_disabled) },
+        post_info: {
+          ...common, title: post.caption,
+          disable_duet: creator.duetDisabled || !options.allowDuet,
+          disable_stitch: creator.stitchDisabled || !options.allowStitch,
+        },
         source_info: { source: 'PULL_FROM_URL', video_url: post.media[0] },
       },
     });
@@ -109,7 +146,7 @@ async function publish(profile, post, token) {
 
   // O nome do campo vem assim mesmo da API ("publicaly"). Posts privados não têm ID público.
   const postId = final.publicaly_available_post_id?.[0];
-  const user = (creator.creator_username || profile.handle || '').replace(/^@/, '');
+  const user = (creator.username || profile.handle || '').replace(/^@/, '');
   return {
     externalId: postId ? String(postId) : publishId,
     url: postId && user ? `https://www.tiktok.com/@${user}/${isVideo(post.media[0]) ? 'video' : 'photo'}/${postId}` : null,
@@ -150,4 +187,4 @@ async function metrics(profile, token) {
   };
 }
 
-module.exports = { SCOPES, authUrl, exchangeCode, refresh, revoke, account, publish, metrics };
+module.exports = { SCOPES, authUrl, exchangeCode, refresh, revoke, account, creatorInfo, publish, metrics };

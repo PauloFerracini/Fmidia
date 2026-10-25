@@ -97,6 +97,18 @@ module.exports = function brandRoutes(db) {
     res.json({ ok: true });
   });
 
+  // Conta e opções de publicação do TikTok (consultadas na hora, como exige o TikTok).
+  r.get('/:brandId/profiles/:profileId/tiktok-creator', requireBrand(db, 'editor'), async (req, res) => {
+    const profile = db.prepare("SELECT * FROM profiles WHERE id = ? AND brand_id = ? AND network = 'tiktok'").get(Number(req.params.profileId), req.brandId);
+    if (!profile) return res.status(404).json({ error: 'Perfil do TikTok não encontrado' });
+    try {
+      res.json(await integrations.tiktokCreatorInfo(db, profile));
+    } catch (err) {
+      // 409 (e não 401) para o painel não confundir com sessão expirada da Fmidia.
+      res.status(409).json({ error: err.message, code: err.auth ? 'reauth' : err.code || null });
+    }
+  });
+
   // Sincroniza agora métricas e comentários de um perfil conectado de verdade.
   r.post('/:brandId/profiles/:profileId/sync', requireBrand(db, 'editor'), async (req, res) => {
     const profile = db.prepare("SELECT * FROM profiles WHERE id = ? AND brand_id = ? AND mode = 'live'").get(Number(req.params.profileId), req.brandId);

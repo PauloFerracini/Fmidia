@@ -245,8 +245,16 @@ test('TikTok: conecta, publica vídeo privado e renova token expirado', async (t
   const tt = (await api(`/api/brands/${brand.id}/profiles`)).body[0];
   assert.equal(tt.handle, '@padaria.tt');
 
-  // App ainda não auditado: só SELF_ONLY disponível.
-  mock('POST', /\/v2\/post\/publish\/creator_info\/query\/$/, () => ({ data: { creator_username: 'padaria.tt', privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } }));
+  // App ainda não auditado: só SELF_ONLY disponível; a conta desativou duetos.
+  mock('POST', /\/v2\/post\/publish\/creator_info\/query\/$/, () => ({
+    data: { creator_username: 'padaria.tt', creator_nickname: 'Padaria', privacy_level_options: ['SELF_ONLY'], duet_disabled: true, max_video_post_duration_sec: 300 },
+    error: { code: 'ok' },
+  }));
+  const info = (await api(`/api/brands/${brand.id}/profiles/${tt.id}/tiktok-creator`)).body;
+  assert.deepEqual(info.privacyOptions, ['SELF_ONLY']);
+  assert.equal(info.nickname, 'Padaria');
+  assert.equal(info.duetDisabled, true);
+  assert.equal(info.maxVideoDurationSec, 300);
   mock('POST', /\/v2\/post\/publish\/video\/init\/$/, () => ({ data: { publish_id: 'v_pub_1' }, error: { code: 'ok' } }));
   let checks = 0;
   mock('POST', /\/v2\/post\/publish\/status\/fetch\/$/, () => ({ data: { status: ++checks < 3 ? 'PROCESSING_DOWNLOAD' : 'PUBLISH_COMPLETE' }, error: { code: 'ok' } }));
@@ -254,8 +262,14 @@ test('TikTok: conecta, publica vídeo privado e renova token expirado', async (t
   // Força o token a parecer expirado para testar a renovação.
   db.prepare('UPDATE profiles SET token_expires_at = ? WHERE id = ?').run(new Date(Date.now() - 1000).toISOString(), tt.id);
   const post = (await api(`/api/brands/${brand.id}/posts`, {
-    method: 'POST', body: { caption: 'Bastidores da fornada', format: 'reels', mediaUrls: ['https://cdn.test/v.mp4'], profileIds: [tt.id] },
+    method: 'POST', body: {
+      caption: 'Bastidores da fornada', format: 'reels', mediaUrls: ['https://cdn.test/v.mp4'], profileIds: [tt.id],
+      tiktok: { [tt.id]: { privacy: 'SELF_ONLY', allowComment: true, allowDuet: true, commercial: true, yourBrand: true } },
+    },
   })).body;
+  assert.deepEqual(post.targets[0].options, {
+    privacy: 'SELF_ONLY', allowComment: true, allowDuet: true, allowStitch: false, commercial: true, yourBrand: true, brandedContent: false,
+  });
   await api(`/api/brands/${brand.id}/posts/${post.id}/schedule`, { method: 'POST', body: { now: true } });
   await runDuePosts(db);
 
@@ -264,10 +278,50 @@ test('TikTok: conecta, publica vídeo privado e renova token expirado', async (t
   assert.equal(published.targets[0].external_id, 'v_pub_1');
   const init = callsTo(/\/video\/init\/$/)[0];
   assert.equal(init.body.post_info.privacy_level, 'SELF_ONLY');
+  assert.equal(init.body.post_info.disable_comment, false, 'comentários liberados pelo usuário');
+  assert.equal(init.body.post_info.disable_duet, true, 'a conta desativou duetos');
+  assert.equal(init.body.post_info.disable_stitch, true, 'costura não marcada');
+  assert.equal(init.body.post_info.brand_organic_toggle, true);
+  assert.equal(init.body.post_info.brand_content_toggle, false);
   assert.equal(init.body.source_info.video_url, 'https://cdn.test/v.mp4');
   assert.equal(init.headers.Authorization, 'Bearer TT_ACCESS_2', 'usa o token renovado');
   assert.equal(callsTo(/\/oauth\/token\/$/).at(-1).body.grant_type, 'refresh_token');
   assert.equal(checks, 3);
+});
+
+test('TikTok: escolhas do usuário são obrigatórias e conferidas na publicação', async (t) => {
+  const { db, server, api, brand } = await setup();
+  t.after(() => server.close());
+  const tt = (await api(`/api/brands/${brand.id}/profiles`, { method: 'POST', body: { network: 'tiktok', handle: 'demo' } })).body;
+  const base = { caption: 'Fotos', format: 'carousel', mediaUrls: ['https://cdn.test/1.jpg', 'https://cdn.test/2.jpg'], profileIds: [tt.id] };
+  const create = (tiktok) => api(`/api/brands/${brand.id}/posts`, { method: 'POST', body: { ...base, tiktok } });
+
+  assert.match((await create()).body.error, /quem pode ver/, 'sem privacidade padrão');
+  assert.match((await create({ [tt.id]: { privacy: 'PUBLIC_TO_EVERYONE', commercial: true } })).body.error, /Sua marca/);
+  assert.match((await create({ [tt.id]: { privacy: 'SELF_ONLY', commercial: true, brandedContent: true } })).body.error, /não pode ser privado/);
+  const ok = (await create({ [tt.id]: { privacy: 'FOLLOWER_OF_CREATOR', allowDuet: true, allowStitch: true } })).body;
+  assert.equal(ok.targets[0].options.allowDuet, false, 'post de fotos não tem dueto');
+
+  // Editar sem mandar `tiktok` mantém as escolhas já salvas.
+  const edited = (await api(`/api/brands/${brand.id}/posts/${ok.id}`, { method: 'PUT', body: { caption: 'Fotos novas' } })).body;
+  assert.equal(edited.targets[0].options.privacy, 'FOLLOWER_OF_CREATOR');
+
+  // Conta real cujas opções mudaram depois do agendamento: falha com mensagem clara.
+  db.prepare("UPDATE profiles SET mode = 'live', external_id = 'O1', access_token = ?, token_expires_at = ? WHERE id = ?")
+    .run(require('../server/secrets').encrypt('T'), new Date(Date.now() + 864e5).toISOString(), tt.id);
+  mock('POST', /creator_info\/query\/$/, () => ({ data: { privacy_level_options: ['SELF_ONLY'] }, error: { code: 'ok' } }));
+  await api(`/api/brands/${brand.id}/posts/${ok.id}/schedule`, { method: 'POST', body: { now: true } });
+  await runDuePosts(db);
+  const failed = (await api(`/api/brands/${brand.id}/posts/${ok.id}`)).body;
+  assert.equal(failed.status, 'failed');
+  assert.match(failed.targets[0].error, /não está mais disponível/);
+  assert.equal(callsTo(/content\/init\/$/).length, 0, 'nada é enviado ao TikTok');
+
+  // Conta bloqueada pelo TikTok: o editor recebe o motivo.
+  mock('POST', /creator_info\/query\/$/, () => ({ data: {}, error: { code: 'spam_risk_too_many_posts', message: 'x' } }));
+  const blocked = await api(`/api/brands/${brand.id}/profiles/${tt.id}/tiktok-creator`);
+  assert.equal(blocked.status, 409);
+  assert.match(blocked.body.error, /limite diário/);
 });
 
 test('publicação interrompida não é repetida automaticamente', async (t) => {

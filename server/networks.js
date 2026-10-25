@@ -34,4 +34,32 @@ function checkMedia(network, format, media) {
   return null;
 }
 
-module.exports = { NETWORKS, FORMATS, isVideo, checkMedia };
+// Níveis de privacidade do TikTok. As opções de cada conta vêm do creator_info.
+const TIKTOK_PRIVACY = ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY'];
+
+// Valida e normaliza as escolhas do usuário para um post no TikTok, seguindo as
+// diretrizes do Direct Post: privacidade escolhida manualmente e divulgação comercial coerente.
+function tiktokOptions(raw, { photo }) {
+  const o = raw || {};
+  if (!TIKTOK_PRIVACY.includes(o.privacy)) return { error: 'Escolha quem pode ver o post no TikTok' };
+  const commercial = Boolean(o.commercial);
+  const yourBrand = commercial && Boolean(o.yourBrand);
+  const brandedContent = commercial && Boolean(o.brandedContent);
+  if (commercial && !yourBrand && !brandedContent) {
+    return { error: 'Na divulgação comercial do TikTok, indique se é "Sua marca", "Conteúdo de marca" ou ambos' };
+  }
+  if (brandedContent && o.privacy === 'SELF_ONLY') {
+    return { error: 'Conteúdo de marca no TikTok não pode ser privado ("Somente eu")' };
+  }
+  return {
+    options: {
+      privacy: o.privacy,
+      allowComment: Boolean(o.allowComment),
+      allowDuet: !photo && Boolean(o.allowDuet),
+      allowStitch: !photo && Boolean(o.allowStitch),
+      commercial, yourBrand, brandedContent,
+    },
+  };
+}
+
+module.exports = { NETWORKS, FORMATS, TIKTOK_PRIVACY, isVideo, checkMedia, tiktokOptions };

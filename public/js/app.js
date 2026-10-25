@@ -10,6 +10,11 @@ const mediaTag = (url, cls = '', attrs = '') => (isVideo(url)
   ? `<video class="${cls}" src="${esc(url)}" muted playsinline preload="metadata" ${attrs}></video>`
   : `<img class="${cls}" src="${esc(url)}" alt="" loading="lazy" ${attrs}>`);
 const KIND = { comment: 'Comentário', message: 'Mensagem direta', mention: 'Menção' };
+const TT_PRIVACY = {
+  PUBLIC_TO_EVERYONE: 'Todos', MUTUAL_FOLLOW_FRIENDS: 'Amigos (seguidores que você segue de volta)',
+  FOLLOWER_OF_CREATOR: 'Seguidores', SELF_ONLY: 'Somente eu',
+};
+const TT_PROCESSING = 'O TikTok pode levar alguns minutos para processar e mostrar o conteúdo no perfil.';
 
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -222,7 +227,7 @@ async function openPost(id) {
     ${p.media.length ? `<div class="media-strip">${p.media.map((u) => mediaTag(u, '', isVideo(u) ? 'controls' : '')).join('')}</div>` : ''}
     <p style="white-space:pre-wrap">${esc(p.caption)}</p>
     <div style="margin-bottom:1em">${p.targets.map((t) => `<div class="row" style="gap:.4em;margin:.25em 0">${netIcon(t.network)}
-      <span class="hint">${esc(t.handle)}${t.mode === 'live' ? '' : ' (demonstração)'}</span>
+      <span class="hint">${esc(t.handle)}${t.mode === 'live' ? '' : ' (demonstração)'}${t.options?.privacy ? ` · visível para: ${esc(TT_PRIVACY[t.options.privacy])}` : ''}</span>
       ${t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">ver na rede ↗</a>` : t.external_id ? '<span class="hint">✓ publicado</span>' : ''}
       ${t.error ? `<span class="hint" style="color:var(--danger)">⚠ ${esc(t.error)}</span>` : ''}</div>`).join('')}</div>
     ${p.approval_comment ? `<p class="reply"><strong>Comentário do cliente:</strong> ${esc(p.approval_comment)}</p>` : ''}
@@ -241,7 +246,8 @@ async function openPost(id) {
         navigator.clipboard?.writeText(location.origin + r.approvalUrl).catch(() => {});
         toast('Enviado para aprovação. Link copiado.');
       } else if (act === 'now') {
-        await bapi(`/posts/${p.id}/schedule`, { method: 'POST', body: { now: true } }); toast('Na fila de publicação');
+        await bapi(`/posts/${p.id}/schedule`, { method: 'POST', body: { now: true } });
+        toast(`Na fila de publicação.${p.targets.some((t) => t.network === 'tiktok') ? ` ${TT_PROCESSING}` : ''}`);
       } else {
         await bapi(`/posts/${p.id}/${act}`, { method: 'POST' }); toast(act === 'schedule' ? 'Post agendado' : 'Agendamento cancelado');
       }
@@ -337,6 +343,7 @@ async function renderComposer(editId) {
           <div class="row" style="margin-top:.4em"><label class="btn small" style="margin:0">⬆ Enviar arquivos<input type="file" id="upload" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" multiple hidden></label>
             <span class="hint" id="upload-status"></span><span class="spacer"></span><a href="#" id="sample" class="hint">Usar imagem de exemplo</a></div>
           <div class="hint">Instagram aceita imagens só em JPEG. Vídeos: MP4 ou MOV. As redes baixam a mídia pelo link, então ele precisa ser público.</div></div>
+        <div id="tiktok-box"></div>
         <div class="field"><label for="when">Data e hora da publicação</label><input id="when" name="when" type="datetime-local" value="${post ? toLocalInput(post.scheduled_at) : defaultDate}"></div>
         <p class="error-msg" id="err"></p>
         <div class="row">
@@ -370,8 +377,110 @@ async function renderComposer(editId) {
       : 'Sem mídia';
   };
   const mediaList = () => $('#media').value.split('\n').map((u) => u.trim()).filter(Boolean);
-  const addMedia = (url) => { $('#media').value = [...mediaList(), url].join('\n'); update(); };
-  form.addEventListener('input', update);
+  const addMedia = (url) => { $('#media').value = [...mediaList(), url].join('\n'); update(); renderTikTok(); };
+  form.addEventListener('input', (e) => {
+    if (e.target.closest('#tiktok-box')) return; // tratado em onTikTokChange
+    update();
+    if (e.target.name === 'profile' || e.target.id === 'media' || e.target.id === 'format') renderTikTok();
+  });
+
+  /* Configurações do TikTok, seguindo as diretrizes do Direct Post: a conta e as opções
+     vêm do creator_info, a privacidade não tem valor padrão e as interações começam desmarcadas. */
+  const tt = {
+    info: new Map(),
+    opts: new Map((post?.targets || []).filter((t) => t.network === 'tiktok').map((t) => [t.id, { ...t.options }])),
+    durations: new Map(),
+  };
+  const tiktokIds = () => [...form.querySelectorAll('[name=profile]:checked')].filter((i) => i.dataset.net === 'tiktok').map((i) => Number(i.value));
+  const loadCreator = async (id) => {
+    if (tt.info.has(id)) return;
+    tt.info.set(id, { loading: true });
+    try { tt.info.set(id, await bapi(`/profiles/${id}/tiktok-creator`)); } catch (err) { tt.info.set(id, { error: err.message }); }
+    renderTikTok();
+  };
+  const probeDuration = (url) => {
+    if (tt.durations.has(url)) return;
+    tt.durations.set(url, null);
+    const v = document.createElement('video');
+    v.preload = 'metadata';
+    v.onloadedmetadata = () => { tt.durations.set(url, v.duration); renderTikTok(); };
+    v.src = url;
+  };
+  // Problemas que impedem publicar neste perfil, conferidos antes de salvar.
+  const tiktokProblem = (id) => {
+    const info = tt.info.get(id) || {};
+    if (info.loading) return 'aguarde o carregamento das opções da conta';
+    if (info.error) return info.error;
+    const media = mediaList();
+    const secs = isVideo(media[0]) ? tt.durations.get(media[0]) : null;
+    if (secs && info.maxVideoDurationSec && secs > info.maxVideoDurationSec) {
+      return `o vídeo tem ${Math.round(secs)} s e esta conta aceita até ${info.maxVideoDurationSec} s`;
+    }
+    return null;
+  };
+  const ttCard = (id, video) => {
+    const p = state.profiles.find((x) => x.id === id);
+    const info = tt.info.get(id) || { loading: true };
+    const head = `<div class="row" style="gap:.5em;margin-bottom:.6em">${netIcon('tiktok')}<strong>Configurações do TikTok</strong></div>`;
+    if (info.loading) return `<div class="tt-card">${head}<p class="hint">Carregando as opções de ${esc(p.handle)}…</p></div>`;
+    if (info.error) return `<div class="tt-card blocked">${head}<p style="color:var(--danger);margin:0">⚠ ${esc(p.handle)}: ${esc(info.error)}</p></div>`;
+    const o = tt.opts.get(id) || {};
+    if (o.privacy && !info.privacyOptions.includes(o.privacy)) o.privacy = undefined; // opção não existe mais
+    const box = (key, label, disabledBy, note) => `<label class="tt-check"><input type="checkbox" data-tt="${id}" data-k="${key}"
+      ${o[key] && !disabledBy ? 'checked' : ''} ${disabledBy ? 'disabled' : ''}> ${label}${disabledBy ? ` <span class="hint">(${note})</span>` : ''}</label>`;
+    const problem = tiktokProblem(id);
+    return `<div class="tt-card" data-card="${id}">${head}
+      <div class="row" style="gap:.5em;margin-bottom:.8em">
+        ${info.avatarUrl ? `<img src="${esc(info.avatarUrl)}" alt="" class="avatar-sm">` : ''}
+        <span>Publicando como <strong>${esc(info.nickname || p.handle)}</strong>${info.username ? ` <span class="hint">@${esc(info.username)}</span>` : ''}</span>
+      </div>
+      <div class="field"><label for="tt-priv-${id}">Quem pode ver este post</label>
+        <select id="tt-priv-${id}" data-tt="${id}" data-k="privacy">
+          <option value="" ${o.privacy ? '' : 'selected'} disabled>Selecione…</option>
+          ${info.privacyOptions.map((v) => {
+            const blockedByBrand = v === 'SELF_ONLY' && o.commercial && o.brandedContent;
+            return `<option value="${v}" ${o.privacy === v ? 'selected' : ''} ${blockedByBrand ? 'disabled' : ''}>${esc(TT_PRIVACY[v] || v)}${blockedByBrand ? ' (indisponível para conteúdo de marca)' : ''}</option>`;
+          }).join('')}
+        </select>
+        ${info.privacyOptions.length === 1 && info.privacyOptions[0] === 'SELF_ONLY' ? '<div class="hint">Esta conta só pode publicar como privado pela Fmidia por enquanto.</div>' : ''}</div>
+      <div class="field"><label>Permitir que os usuários</label>
+        ${box('allowComment', 'Comentem', info.commentDisabled, 'desativado nas configurações da conta')}
+        ${video ? box('allowDuet', 'Façam dueto', info.duetDisabled, 'desativado nas configurações da conta')
+          + box('allowStitch', 'Façam costura (Stitch)', info.stitchDisabled, 'desativado nas configurações da conta') : ''}
+      </div>
+      <div class="field">
+        <label class="tt-check tt-switch"><input type="checkbox" data-tt="${id}" data-k="commercial" ${o.commercial ? 'checked' : ''}> <strong>Divulgar conteúdo comercial</strong></label>
+        <div class="hint">Ative se este conteúdo promove você, uma marca, um produto ou um serviço.</div>
+        ${o.commercial ? `<div class="tt-sub">
+          ${box('yourBrand', '<span><strong>Sua marca</strong><br><span class="hint">Você promove a si mesmo ou o seu próprio negócio.</span></span>')}
+          ${box('brandedContent', '<span><strong>Conteúdo de marca</strong><br><span class="hint">Você promove outra marca ou um terceiro.</span></span>', o.privacy === 'SELF_ONLY', 'não pode ser privado: mude quem pode ver')}
+          <div class="hint" style="margin-top:.3em">${o.brandedContent ? 'O post será rotulado como <strong>“Parceria paga”</strong>.'
+            : o.yourBrand ? 'O post será rotulado como <strong>“Conteúdo promocional”</strong>.'
+            : '<span style="color:var(--danger)">Selecione ao menos uma opção.</span>'}</div></div>` : ''}
+      </div>
+      ${problem ? `<p style="color:var(--danger);margin:.2em 0 .6em">⚠ ${esc(problem)}</p>` : ''}
+      <p class="hint" style="margin:0">Ao publicar, você concorda com a <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" rel="noopener">Confirmação de Uso de Música</a>${o.commercial && o.brandedContent ? ' e com a <a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" rel="noopener">Política de Conteúdo de Marca</a>' : ''} do TikTok.</p>
+    </div>`;
+  };
+  function renderTikTok() {
+    const ids = tiktokIds();
+    const media = mediaList();
+    const video = isVideo(media[0]);
+    if (video) probeDuration(media[0]);
+    $('#tiktok-box').innerHTML = ids.map((id) => ttCard(id, video)).join('');
+    ids.forEach(loadCreator);
+  }
+  $('#tiktok-box').addEventListener('change', (e) => {
+    const el = e.target.closest('[data-tt]');
+    if (!el) return;
+    const id = Number(el.dataset.tt);
+    const o = tt.opts.get(id) || {};
+    o[el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value;
+    if (!o.commercial) { o.yourBrand = false; o.brandedContent = false; }
+    tt.opts.set(id, o);
+    $('#err').textContent = '';
+    renderTikTok();
+  });
   $('#sample').onclick = (e) => { e.preventDefault(); addMedia(`https://picsum.photos/seed/${Date.now()}/1080/1080.jpg`); };
   $('#upload').onchange = async (e) => {
     const files = [...e.target.files];
@@ -388,6 +497,7 @@ async function renderComposer(editId) {
     e.target.value = '';
   };
   update();
+  renderTikTok();
 
   let then = 'draft';
   form.querySelectorAll('[data-then]').forEach((b) => b.addEventListener('click', () => (then = b.dataset.then)));
@@ -397,14 +507,23 @@ async function renderComposer(editId) {
     const when = $('#when').value;
     if (then === 'schedule' && !when) return ($('#err').textContent = 'Defina a data e hora para agendar');
     if (then === 'schedule' && new Date(when) < new Date()) return ($('#err').textContent = 'A data precisa estar no futuro');
+    const ttIds = tiktokIds();
+    for (const id of ttIds) {
+      const problem = tiktokProblem(id);
+      if (problem) return ($('#err').textContent = `TikTok ${state.profiles.find((x) => x.id === id).handle}: ${problem}`);
+    }
     const body = {
       caption: $('#caption').value, mediaUrls: mediaList(), format: $('#format').value,
       scheduledAt: when ? new Date(when).toISOString() : null,
       profileIds: [...form.querySelectorAll('[name=profile]:checked')].map((i) => Number(i.value)),
+      tiktok: Object.fromEntries(ttIds.map((id) => [id, tt.opts.get(id) || {}])),
     };
     try {
       const saved = post ? await bapi(`/posts/${post.id}`, { method: 'PUT', body }) : await bapi('/posts', { method: 'POST', body });
-      if (then === 'schedule') { await bapi(`/posts/${saved.id}/schedule`, { method: 'POST' }); toast('Post agendado!'); }
+      if (then === 'schedule') {
+        await bapi(`/posts/${saved.id}/schedule`, { method: 'POST' });
+        toast(`Post agendado!${ttIds.length ? ` ${TT_PROCESSING}` : ''}`);
+      }
       else if (then === 'approval') {
         const r = await bapi(`/posts/${saved.id}/request-approval`, { method: 'POST' });
         navigator.clipboard?.writeText(location.origin + r.approvalUrl).catch(() => {});

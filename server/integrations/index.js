@@ -46,9 +46,22 @@ async function withToken(db, profile, fn) {
 
 const PUBLISHERS = { instagram: meta.publishInstagram, facebook: meta.publishFacebook, tiktok: tiktok.publish };
 
-async function publish(db, profile, post) {
+// `options`: escolhas do usuário para este perfil (ex.: privacidade do TikTok).
+async function publish(db, profile, post, options = {}) {
   if (profile.mode !== 'live') return simulatedPublish(profile, post);
-  return withToken(db, profile, (token) => PUBLISHERS[profile.network](profile, post, token));
+  return withToken(db, profile, (token) => PUBLISHERS[profile.network](profile, post, token, options));
+}
+
+// Opções de publicação da conta do TikTok, para o editor. Perfis de demonstração liberam tudo.
+async function tiktokCreatorInfo(db, profile) {
+  if (profile.mode !== 'live') {
+    return {
+      nickname: profile.display_name || profile.handle.replace(/^@/, ''), username: profile.handle.replace(/^@/, ''),
+      avatarUrl: profile.avatar_url, privacyOptions: ['PUBLIC_TO_EVERYONE', 'MUTUAL_FOLLOW_FRIENDS', 'FOLLOWER_OF_CREATOR', 'SELF_ONLY'],
+      commentDisabled: false, duetDisabled: false, stitchDisabled: false, maxVideoDurationSec: 600,
+    };
+  }
+  return withToken(db, profile, (token) => tiktok.creatorInfo(token));
 }
 
 const METRICS = {
@@ -124,4 +137,4 @@ function saveAccounts(db, brandId, accounts) {
   ).id);
 }
 
-module.exports = { PUBLIC_PROFILE_COLS, publish, syncMetrics, syncInbox, reply, disconnect, saveAccounts };
+module.exports = { PUBLIC_PROFILE_COLS, publish, tiktokCreatorInfo, syncMetrics, syncInbox, reply, disconnect, saveAccounts };

@@ -17,14 +17,14 @@ async function runDuePosts(db, now = new Date()) {
       processed++;
       const post = { id: row.id, caption: row.caption, format: row.format, media: JSON.parse(row.media_urls || '[]') };
       const targets = db.prepare(
-        'SELECT p.*, t.external_id AS done FROM post_targets t JOIN profiles p ON p.id = t.profile_id WHERE t.post_id = ?'
+        'SELECT p.*, t.external_id AS done, t.options AS target_options FROM post_targets t JOIN profiles p ON p.id = t.profile_id WHERE t.post_id = ?'
       ).all(row.id);
 
       let ok = 0;
       for (const profile of targets) {
         if (profile.done) { ok++; continue; } // já publicado numa tentativa anterior
         try {
-          const { externalId, url } = await integrations.publish(db, profile, post);
+          const { externalId, url } = await integrations.publish(db, profile, post, JSON.parse(profile.target_options || '{}'));
           db.prepare('UPDATE post_targets SET external_id = ?, url = ?, error = NULL WHERE post_id = ? AND profile_id = ?')
             .run(externalId, url || null, row.id, profile.id);
           ok++;

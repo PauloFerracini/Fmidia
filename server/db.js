@@ -149,6 +149,8 @@ const MIGRATIONS = [
      accounts TEXT NOT NULL,
      created_at TEXT NOT NULL
    );`,
+  // 2: configurações de publicação por perfil (privacidade e interações do TikTok).
+  `ALTER TABLE post_targets ADD COLUMN options TEXT NOT NULL DEFAULT '{}';`,
 ];
 
 function migrate(db) {

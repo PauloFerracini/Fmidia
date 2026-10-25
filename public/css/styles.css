@@ -253,3 +253,12 @@ video.thumb { display: block; }
   .profiles-table td:nth-child(4), .profiles-table td:last-child { width: 100%; }
   .profiles-table td:last-child .row { justify-content: flex-start !important; }
 }
+
+/* Configurações do TikTok no editor */
+.tt-card { border: 1px solid var(--border); border-radius: var(--radius); padding: 1em; margin-bottom: 1em; background: var(--surface-2); }
+.tt-card.blocked { border-color: var(--danger); background: var(--danger-soft); }
+.tt-card select { background: var(--surface); }
+.tt-check { display: flex; align-items: flex-start; gap: .5em; font-weight: 400; margin: .35em 0; cursor: pointer; }
+.tt-check input { width: auto; margin: .3em 0 0; flex-shrink: 0; }
+.tt-check:has(input:disabled) { cursor: not-allowed; opacity: .7; }
+.tt-sub { margin: .4em 0 0 1.6em; }

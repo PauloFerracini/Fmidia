@@ -92,7 +92,24 @@ Requisito do lado do cliente: o Instagram precisa ser **conta profissional** (Em
 2. Cadastre a URL de redirecionamento `https://SEU_DOMINIO/api/oauth/tiktok/callback`, os links de termos e privacidade e os escopos `user.info.basic`, `user.info.profile`, `user.info.stats`, `video.list` e `video.publish`.
 3. Em *URL properties*, **verifique o domínio** de `PUBLIC_URL`: o TikTok só baixa mídia (`PULL_FROM_URL`) de domínios verificados.
 4. Copie *Client key* e *Client secret* para `TIKTOK_CLIENT_KEY` e `TIKTOK_CLIENT_SECRET`.
-5. **Antes da auditoria do TikTok, todo post sai como privado** (`SELF_ONLY`), visível só para o dono da conta. Para publicar de forma pública, envie o app para auditoria. O TikTok exige que a tela de publicação mostre o nome do criador e deixe o usuário escolher a privacidade e as permissões de interação; hoje a Fmidia usa `TIKTOK_PRIVACY` (padrão `PUBLIC_TO_EVERYONE`, caindo para privado se não for permitido). Esses controles precisam ser adicionados ao editor antes da auditoria.
+5. **Antes da auditoria do TikTok, todo post sai como privado** (`SELF_ONLY`), visível só para o dono da conta; a Fmidia mostra isso no editor. Para publicar de forma pública, envie o app para auditoria.
+
+#### Tela de publicação do TikTok (requisitos da auditoria)
+
+Ao selecionar uma conta do TikTok, o editor mostra o painel **Configurações do TikTok**, que segue as diretrizes de UX do *Direct Post*:
+
+- **Conta:** nome e @ de quem vai publicar, obtidos na hora pelo `creator_info` da conta.
+- **Quem pode ver:** só as opções que a conta permite, **sem valor pré-selecionado**.
+- **Interações** (comentários, duetos e costura): começam **desmarcadas**; ficam desativadas se a conta as bloqueou. Duetos e costura só aparecem para vídeo.
+- **Divulgação de conteúdo comercial:** desligada por padrão. Ao ligar, é preciso escolher *Sua marca* (rótulo "Conteúdo promocional") e/ou *Conteúdo de marca* (rótulo "Parceria paga"). Conteúdo de marca não pode ser privado: a opção "Somente eu" fica indisponível e vice-versa.
+- **Declaração:** link para a Confirmação de Uso de Música (e para a Política de Conteúdo de Marca, quando aplicável).
+- **Duração do vídeo:** conferida contra o limite da conta antes de salvar.
+- **Bloqueios da conta** (limite diário de posts, conta impedida): exibidos no painel e impedem salvar.
+- **Aviso** de que o TikTok pode levar alguns minutos para processar o conteúdo.
+
+As escolhas são salvas por perfil no post e conferidas de novo na hora da publicação. Se a conta deixar de permitir a privacidade escolhida, o post falha com uma mensagem pedindo para editar, sem enviar nada ao TikTok.
+
+Para o vídeo da auditoria, grave o fluxo completo: conectar a conta, criar um post com esse painel, publicar e mostrar o resultado no TikTok.
 
 ### Como funciona
 
