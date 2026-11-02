@@ -1,0 +1,81 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; }
+    .cap-word {
+      position: absolute; left: 0; right: 0; top: var(--cap-top, 1060px);
+      text-align: center; overflow: visible;
+    }
+    .cap-word span {
+      display: inline-block;
+      font-family: "League Gothic", sans-serif;
+      font-size: 132px; line-height: 1; letter-spacing: 0.01em;
+      color: var(--cap-color, #ffc72c);
+      text-shadow: 0 4px 18px rgba(0,0,0,.55);
+    }
+    .cap-word.emph span { font-size: 168px; }
+  </style>
+  <div id="root" data-composition-id="captions" data-width="1080" data-height="1920">
+    <div id="w0" class="clip cap-word emph" data-start="0.25" data-duration="0.67"><span>NINGUÉM</span></div>
+    <div id="w1" class="clip cap-word" data-start="0.92" data-duration="0.4"><span>VÊ</span></div>
+    <div id="w2" class="clip cap-word" data-start="1.32" data-duration="0.38"><span>O</span></div>
+    <div id="w3" class="clip cap-word" data-start="1.7" data-duration="0.47"><span>QUANTO</span></div>
+    <div id="w4" class="clip cap-word" data-start="2.17" data-duration="0.43"><span>VOCÊ</span></div>
+    <div id="w5" class="clip cap-word" data-start="2.6" data-duration="0.43"><span>LUTA</span></div>
+    <div id="w6" class="clip cap-word" data-start="3.03" data-duration="0.4"><span>EM</span></div>
+    <div id="w7" class="clip cap-word emph" data-start="3.43" data-duration="0.68"><span>SILÊNCIO</span></div>
+    <div id="w8" class="clip cap-word" data-start="4.56" data-duration="0.41"><span>MAS</span></div>
+    <div id="w9" class="clip cap-word" data-start="4.97" data-duration="0.38"><span>O</span></div>
+    <div id="w10" class="clip cap-word" data-start="5.35" data-duration="0.45"><span>MESMO</span></div>
+    <div id="w11" class="clip cap-word" data-start="5.8" data-duration="0.45"><span>MUNDO</span></div>
+    <div id="w12" class="clip cap-word" data-start="6.25" data-duration="0.41"><span>QUE</span></div>
+    <div id="w13" class="clip cap-word emph" data-start="6.66" data-duration="0.67"><span>DUVIDOU</span></div>
+    <div id="w14" class="clip cap-word" data-start="7.33" data-duration="0.41"><span>VAI</span></div>
+    <div id="w15" class="clip cap-word" data-start="7.74" data-duration="0.52"><span>PERGUNTAR</span></div>
+    <div id="w16" class="clip cap-word" data-start="8.26" data-duration="0.43"><span>COMO</span></div>
+    <div id="w17" class="clip cap-word" data-start="8.69" data-duration="0.43"><span>VOCÊ</span></div>
+    <div id="w18" class="clip cap-word emph" data-start="9.12" data-duration="0.7"><span>CONSEGUIU</span></div>
+    <div id="w19" class="clip cap-word" data-start="10.27" data-duration="0.45"><span>ENTÃO</span></div>
+    <div id="w20" class="clip cap-word emph" data-start="10.72" data-duration="0.68"><span>CONTINUA</span></div>
+    <div id="w21" class="clip cap-word" data-start="11.85" data-duration="0.43"><span>QUEM</span></div>
+    <div id="w22" class="clip cap-word emph" data-start="12.28" data-duration="0.67"><span>DESISTE</span></div>
+    <div id="w23" class="clip cap-word" data-start="12.95" data-duration="0.4"><span>NO</span></div>
+    <div id="w24" class="clip cap-word" data-start="13.35" data-duration="0.43"><span>MEIO</span></div>
+    <div id="w25" class="clip cap-word" data-start="13.78" data-duration="0.45"><span>NUNCA</span></div>
+    <div id="w26" class="clip cap-word" data-start="14.23" data-duration="0.5"><span>DESCOBRE</span></div>
+    <div id="w27" class="clip cap-word" data-start="14.73" data-duration="0.38"><span>O</span></div>
+    <div id="w28" class="clip cap-word emph" data-start="15.11" data-duration="0.63"><span>FINAL</span></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    tl.fromTo("#w0 span", { scale: 1.25, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 0.25);
+    tl.fromTo("#w1 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 0.92);
+    tl.fromTo("#w2 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 1.32);
+    tl.fromTo("#w3 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 1.7);
+    tl.fromTo("#w4 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 2.17);
+    tl.fromTo("#w5 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 2.6);
+    tl.fromTo("#w6 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 3.03);
+    tl.fromTo("#w7 span", { scale: 1.25, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 3.43);
+    tl.fromTo("#w8 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 4.56);
+    tl.fromTo("#w9 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 4.97);
+    tl.fromTo("#w10 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 5.35);
+    tl.fromTo("#w11 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 5.8);
+    tl.fromTo("#w12 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 6.25);
+    tl.fromTo("#w13 span", { scale: 1.25, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 6.66);
+    tl.fromTo("#w14 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 7.33);
+    tl.fromTo("#w15 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 7.74);
+    tl.fromTo("#w16 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 8.26);
+    tl.fromTo("#w17 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 8.69);
+    tl.fromTo("#w18 span", { scale: 1.25, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 9.12);
+    tl.fromTo("#w19 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 10.27);
+    tl.fromTo("#w20 span", { scale: 1.25, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 10.72);
+    tl.fromTo("#w21 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 11.85);
+    tl.fromTo("#w22 span", { scale: 1.25, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 12.28);
+    tl.fromTo("#w23 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 12.95);
+    tl.fromTo("#w24 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 13.35);
+    tl.fromTo("#w25 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 13.78);
+    tl.fromTo("#w26 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 14.23);
+    tl.fromTo("#w27 span", { scale: 1.1, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 14.73);
+    tl.fromTo("#w28 span", { scale: 1.25, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.09, ease: "power3.out" }, 15.11);
+    window.__timelines["captions"] = tl;
+  </script>
+</template>

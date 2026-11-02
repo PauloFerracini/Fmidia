@@ -1,61 +1,39 @@
 <!doctype html>
-<html lang="en" data-resolution="portrait">
+<html lang="pt-BR" data-resolution="portrait"
+  data-composition-variables='[{"id":"photo","type":"string","label":"Foto da modelo","default":"assets/modelo.jpg"},{"id":"handle","type":"string","label":"@ do perfil","default":"@fmidia"},{"id":"brand","type":"string","label":"Marca","default":"Fmidia"}]'>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=1080, height=1920" />
     <script src="assets/vendor/gsap.min.js"></script>
     <style>
-      /* Placeholders: replace all three with the film's own palette and display face. */
-      :root {
-        --ground: #000;
-        --ink: #ffffff;
-        --font-display: sans-serif;
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; }
+      #root { position: relative; width: 100%; height: 100%; }
+      #photo { z-index: 1; }
+      #captions { z-index: 2; }
+      #watermark {
+        position: absolute; right: 70px; top: 1270px; z-index: 3;
+        font-family: "Inter", sans-serif; font-weight: 700; font-size: 30px;
+        color: rgba(255,255,255,.8); text-align: right;
       }
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      html,
-      body {
-        margin: 0;
-        width: 1080px;
-        height: 1920px;
-        overflow: hidden;
-        background: var(--ground);
-      }
-      #root {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-family: var(--font-display);
-      }
-      #title {
-        color: var(--ink);
-        font-size: 72px;
-        font-weight: 600;
-        letter-spacing: -0.03em;
-      }
+      #endcard { z-index: 4; }
     </style>
   </head>
   <body>
-    <div
-      id="root"
-      data-composition-id="main"
-      data-start="0"
-      data-duration="10"
-      data-width="1080"
-      data-height="1920"
-    >
-      <h1 id="title" class="clip" data-start="0" data-duration="10" data-track-index="0">Fmidia</h1>
+    <div id="root" data-composition-id="main" data-start="0" data-duration="20" data-width="1080" data-height="1920">
+      <div id="photo" data-composition-id="photo" data-composition-src="compositions/photo.html"
+        data-start="0" data-duration="16.4" data-track-index="0" data-track-kind="graphics"
+        data-width="1080" data-height="1920"></div>
+      <div id="captions" data-composition-id="captions" data-composition-src="compositions/captions.html"
+        data-start="0" data-duration="16.4" data-track-index="1" data-track-kind="captions"
+        data-width="1080" data-height="1920"></div>
+      <div id="watermark" class="clip" data-start="0" data-duration="16.4" data-track-index="2" data-var-text="handle">@fmidia</div>
+      <div id="endcard" data-composition-id="endcard" data-composition-src="compositions/endcard.html"
+        data-start="16.9" data-duration="3.1" data-track-index="3" data-track-kind="graphics"
+        data-width="1080" data-height="1920"></div>
     </div>
     <script>
-      const tl = gsap.timeline({ paused: true });
-      tl.fromTo("#title", { opacity: 0, filter: "blur(8px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.18, ease: "power4.out" }, 0);
-      window.__timelines["main"] = tl;
-      tl.seek(0);
+      window.__timelines["main"] = gsap.timeline({ paused: true });
     </script>
   </body>
 </html>

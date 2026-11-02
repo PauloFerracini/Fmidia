@@ -1,0 +1,38 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; background: #000; }
+    #photo-frame { position: absolute; inset: 0; }
+    #photo-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
+    #photo-shade {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(0,0,0,.15) 0%, rgba(0,0,0,0) 35%, rgba(0,0,0,.35) 75%, rgba(0,0,0,.7) 100%);
+    }
+  </style>
+  <div id="root" data-composition-id="photo" data-width="1080" data-height="1920">
+    <div id="photo-frame">
+      <img id="photo-img" src="assets/modelo.jpg" data-var-src="photo" alt="" />
+    </div>
+    <div id="photo-shade"></div>
+  </div>
+  <script>
+    const tl = gsap.timeline({ paused: true });
+    // Push-in lento durante todo o vídeo
+    tl.fromTo("#photo-img", { scale: 1.04, yPercent: 0 }, { scale: 1.16, yPercent: -1.5, duration: 16.19, ease: "none" }, 0);
+    // Punch-ins nas palavras de destaque
+    tl.fromTo("#photo-frame", { scale: 1 }, { scale: 1.05, x: -14, duration: 0.12, ease: "power3.out" }, 0.25);
+    tl.to("#photo-frame", { scale: 1, x: 0, duration: 0.5, ease: "power2.inOut" }, 0.92);
+    tl.fromTo("#photo-frame", { scale: 1 }, { scale: 1.07, x: 14, duration: 0.12, ease: "power3.out" }, 3.43);
+    tl.to("#photo-frame", { scale: 1, x: 0, duration: 0.5, ease: "power2.inOut" }, 4.11);
+    tl.fromTo("#photo-frame", { scale: 1 }, { scale: 1.05, x: -14, duration: 0.12, ease: "power3.out" }, 6.66);
+    tl.to("#photo-frame", { scale: 1, x: 0, duration: 0.5, ease: "power2.inOut" }, 7.33);
+    tl.fromTo("#photo-frame", { scale: 1 }, { scale: 1.07, x: 14, duration: 0.12, ease: "power3.out" }, 9.12);
+    tl.to("#photo-frame", { scale: 1, x: 0, duration: 0.5, ease: "power2.inOut" }, 9.82);
+    tl.fromTo("#photo-frame", { scale: 1 }, { scale: 1.05, x: -14, duration: 0.12, ease: "power3.out" }, 10.72);
+    tl.to("#photo-frame", { scale: 1, x: 0, duration: 0.5, ease: "power2.inOut" }, 11.4);
+    tl.fromTo("#photo-frame", { scale: 1 }, { scale: 1.07, x: 14, duration: 0.12, ease: "power3.out" }, 12.28);
+    tl.to("#photo-frame", { scale: 1, x: 0, duration: 0.5, ease: "power2.inOut" }, 12.95);
+    tl.fromTo("#photo-frame", { scale: 1 }, { scale: 1.05, x: -14, duration: 0.12, ease: "power3.out" }, 15.11);
+    tl.to("#photo-frame", { scale: 1, x: 0, duration: 0.5, ease: "power2.inOut" }, 15.74);
+    window.__timelines["photo"] = tl;
+  </script>
+</template>
