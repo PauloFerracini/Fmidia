@@ -4,15 +4,23 @@
   "description": "Fmidia — plataforma de gestão de redes sociais (agendamento, aprovação, analytics, relatórios e inbox).",
   "main": "server/index.js",
   "type": "commonjs",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "start": "node --no-warnings --env-file-if-exists=.env server/index.js",
     "dev": "node --no-warnings --env-file-if-exists=.env --watch server/index.js",
     "seed": "node --no-warnings server/seed.js",
-    "test": "node --no-warnings --test test/*.test.js"
+    "test": "node --no-warnings --test test/*.test.js",
+    "video:dev": "hyperframes preview videos",
+    "video:check": "hyperframes check videos",
+    "video:render": "cd videos && hyperframes render -o renders/output.mp4"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
     "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "hyperframes": "^0.9.5"
   }
 }
